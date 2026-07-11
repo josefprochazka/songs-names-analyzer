@@ -29,8 +29,11 @@ potřebuje Linux prostředí pro TS/Node vývoj. Projekt fyzicky žije na WSL
 filesystému:
 
 ```
-\\wsl.localhost\Ubuntu\home\josefprochazka\repos-ubuntu\songs-analyzer-backend
+\\wsl.localhost\Ubuntu\home\josefprochazka\repos-ubuntu\songs-names-analyzer\backend
 ```
+
+(Pozn.: projekt byl 2026-07-11 sloučen s frontendem do jednoho monorepa
+`songs-names-analyzer` — viz `../README-CLAUDE.md` pro celkový přehled.)
 
 Zjištěné problémy a jak je řešit:
 
@@ -44,11 +47,20 @@ Zjištěné problémy a jak je řešit:
   **nikdy nepoužívat `~` v cestách v tomto prostředí** — vždy pracovat
   s relativní cestou vůči aktuálnímu `pwd`, nebo s plnou UNC/explicitní cestou.
 - Aktuální pracovní adresář (`pwd`) při práci na tomto projektu by měl být vždy
-  přímo `.../repos-ubuntu/songs-analyzer-backend` — ověřovat přes `pwd` na
-  začátku session, ne spoléhat na `cd ~/...`.
+  přímo `.../repos-ubuntu/songs-names-analyzer/backend` — ověřovat přes `pwd`
+  na začátku session, ne spoléhat na `cd ~/...`.
 - Projekty se drží striktně na WSL filesystému (`/home/...`), NE na
   `/mnt/c/...` (Windows disk) — kvůli výkonu (nativní ext4 vs. 9p protokol
   přes Windows mount).
+
+## PRAVIDLO: Claude appku sám nespouští
+
+Uživatel má vlastní otevřený WSL terminál a appku (dev server, build, atd.)
+si spouští **sám**. Claude appku nikdy sám nespouští ani netestuje spuštěním
+(ani přes Bash nástroj, ani přes PowerShell) — role je jasně dělená: Claude
+píše/upravuje kód, uživatel ho spouští a testuje. Pokud je potřeba něco
+ověřit v běhu, Claude řekne uživateli přesně jaký příkaz a kde spustit,
+nespouští ho za něj.
 
 ## Aktuální stav (2026-07-11)
 

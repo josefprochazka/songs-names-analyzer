@@ -52,6 +52,15 @@ filesystému:
   přístup z Windows strany použít PowerShell nebo WSL terminál.
 - Projekt zůstává na WSL filesystému (`/home/...`), ne na `/mnt/c/...`.
 
+## PRAVIDLO: Claude appku sám nespouští
+
+Uživatel má vlastní otevřený WSL terminál a appku (dev server, build, atd.)
+si spouští **sám**. Claude appku nikdy sám nespouští ani netestuje spuštěním
+(ani přes Bash nástroj, ani přes PowerShell) — role je jasně dělená: Claude
+píše/upravuje kód, uživatel ho spouští a testuje. Pokud je potřeba něco
+ověřit v běhu, Claude řekne uživateli přesně jaký příkaz a kde spustit,
+nespouští ho za něj.
+
 ## Nasazení (plánováno, zatím neřešeno)
 
 Cíl: nasadit zdarma, aby appka měla veřejnou adresu.
