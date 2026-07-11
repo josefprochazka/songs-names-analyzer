@@ -72,23 +72,32 @@ píše/upravuje kód, uživatel ho spouští a testuje. Pokud je potřeba něco
 ověřit v běhu, Claude řekne uživateli přesně jaký příkaz a kde spustit,
 nespouští ho za něj.
 
-## Aktuální stav (2026-07-11)
+## Aktuální stav (k 2026-07-11, večer)
 
-- [x] Čistá kostra React + TypeScript + Vite + ESLint vytvořená
-- [x] Závislosti nainstalované přes npm
-- [x] Projekt propojený s GitHub repozitářem
-      (`https://github.com/josefprochazka/songs-analyzer-frontend`)
+- [x] Čistá kostra React + TypeScript + Vite + ESLint, součást monorepa
+      `songs-names-analyzer`
 - [x] Založen tento `README-CLAUDE.md`
-- [ ] Vyčištění Vite šablony, žádný kód zatím neupravován (čeká na další krok)
+- [x] **Nasazeno na Vercel** (free, root dir `frontend`, auto-deploy z
+      `main` — push na GitHub → nový build během ~minuty)
+- [x] `App.tsx`/`App.css` přepsané na **dočasnou "hello wife" stránku**:
+      růžová unicorn karta s animovaným duhovým nadpisem "Ahoj bejby!",
+      blikajícím textem "Brzy tady uvidíš data všech písní. Těš se!",
+      padajícími emoji a srdíčky. Čistě zábavný placeholder pro manželku,
+      **přepíše se** až budeme dělat skutečné UI se statistikami.
+- [x] Opravena chyba: nadpis byl vertikálně useknutý kvůli zděděnému
+      `line-height: 145%` z `:root` (v `index.css`) počítanému z 18px
+      základního fontu — na 48px nadpisu to dělalo příliš nízký line-box.
+      Fix: explicitní `line-height` přidán na `.rainbow-text`,
+      `.unicorn-emoji`, `.bounce-text`, `.hearts` v `App.css`. Ponaučení:
+      při vlastním `font-size` v komponentě vždy nastavit i vlastní
+      `line-height`, nespoléhat na zděděnou hodnotu z `:root`.
+- [ ] Skutečné UI pro statistiky/grafy (čeká na hotový backend + API)
 
-## Plán práce — budoucí kroky (zatím NEIMPLEMENTOVÁNO)
+## Plán práce — budoucí kroky
 
-1. Vyčistit balast z výchozí Vite šablony a upravit `App.tsx`, aby zobrazoval
-   "Hello World" s nadpisem "Songs Analyzer".
-2. Připojení na backend API (`songs-analyzer-backend`).
-3. Tvorba UI pro statistiky a grafy (nejčastější písně, historie podle data,
+1. Počkat, až bude hotová Prisma/DB vrstva a API endpointy v backendu.
+2. Nahradit unicorn placeholder skutečným UI: napojení na backend API,
+   zobrazení statistik a grafů (nejčastější písně, historie podle data,
    přehled neznámých/nerozpoznaných záznamů — `UnknownSong`).
-
-Poznámka: v tomto kroku se **žádný kód neprogramoval ani neupravoval** — pouze
-byl založen tento kontextový soubor. Implementace začne až v dalším kroku na
-explicitní pokyn.
+3. Ověřit, že produkční frontend (Vercel) správně volá produkční backend
+   (Render) — bude potřeba nastavit backend URL jako env proměnnou.

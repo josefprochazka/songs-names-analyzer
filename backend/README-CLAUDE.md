@@ -62,18 +62,40 @@ píše/upravuje kód, uživatel ho spouští a testuje. Pokud je potřeba něco
 ověřit v běhu, Claude řekne uživateli přesně jaký příkaz a kde spustit,
 nespouští ho za něj.
 
-## Aktuální stav (2026-07-11)
+## Aktuální stav (k 2026-07-11, večer)
 
-- [x] Čistá kostra NestJS projektu vytvořená a propojená s GitHub repem
-      (`https://github.com/josefprochazka/songs-analyzer-backend`)
+- [x] Čistá kostra NestJS projektu, součást monorepa `songs-names-analyzer`
 - [x] Založen tento `README-CLAUDE.md`
-- [ ] Prisma + SQLite nastavení (probíhá)
+- [x] **Nasazeno na Render** (free tier, root dir `backend`, auto-deploy z
+      `main`) — `https://songs-names-analyzer.onrender.com`. Zatím jede jen
+      holá kostra (defaultní "Hello World!" na `/`), žádná DB logika.
+- [x] Build/start command na Renderu: `npm install && npm run build` /
+      `npm run start:prod`
+- [x] **Turso databáze založená** (SQLite-kompatibilní, persistentní free
+      tier — řeší problém, že Render má nepersistentní disk). Env proměnné
+      `TURSO_DATABASE_URL` a `TURSO_AUTH_TOKEN` už jsou nastavené v Render
+      dashboardu, ale kód je zatím nepoužívá.
+- [x] **Zdrojová data zálohovaná** v `backend/data/`:
+      - `songs-source-06-2026.xlsx` — vyčištěný seznam (datum, píseň), uživatel
+        to ručně zpracoval z rozházeného Google Sheetu (3 sloupce písní,
+        nekonzistentní oddělovače — čárka/středník/nový řádek, viz historie
+        konverzace pro detaily o té messy struktuře)
+      - `song-names-dictionary.txt` — číselník správných/kanonických názvů
+        písní pro kontrolu/matchování při importu
+      - `.gitignore` upraven o `*:Zone.Identifier` (Windows artefakt ze
+        stahování souborů, nekomitovat)
+- [ ] **DALŠÍ KROK: Prisma + SQLite nastavení** (viz plán níže — ještě
+      nezačato, čeká se na pokyn uživatele)
 - [ ] Prisma schema: `Song`, `SongHistory`, `UnknownSong`
 - [ ] První migrace / SQLite soubor vygenerován
 - [ ] `PrismaModule` + `PrismaService` v NestJS, zaregistrováno v `AppModule`
+- [ ] Import dat z `backend/data/` do databáze (přes import skript, uživatel
+      ho spustí sám ve svém WSL terminálu)
+- [ ] Napojení Prismy na Turso pro produkci (Render)
+- [ ] API endpoint(y) pro statistiky písní
 - [ ] Google Sheets integrace (zatím neřešeno, plánováno na později)
 
-## Plán práce — DB vrstva (aktuální krok)
+## Plán práce — DB vrstva (další krok)
 
 1. Nainstalovat `prisma` (dev) a `@prisma/client` (dependency)
 2. `npx prisma init --datasource-provider sqlite`
