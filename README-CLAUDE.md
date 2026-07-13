@@ -89,11 +89,13 @@ hotové, je to jeden z dalších kroků.
 - [x] Zdrojová data zálohovaná v `backend/data/` (viz backend README) —
       vyčištěný CSV/xlsx export (datum + píseň) + číselník správných názvů
       písní, obojí commitnuté v gitu jako trvalá záloha
-- [ ] **DALŠÍ KROK: Prisma + SQLite v backendu** (viz backend/README-CLAUDE.md
-      pro detailní rozpis)
+- [x] **Prisma + SQLite v backendu hotovo** (2026-07-13, viz
+      backend/README-CLAUDE.md pro detailní rozpis a zádrhely)
+- [x] **Import dat hotov** — 103 písní, 583 řádků historie, 0 unknown
+      (`npm run import:data` v `backend/`)
+- [ ] **DALŠÍ KROK: `PrismaModule`/`PrismaService` v NestJS** + backend API
+      endpoint(y) vracející statistiky písní
 - [ ] Napojení Prismy na Turso v produkci
-- [ ] Import dat z `backend/data/` do databáze
-- [ ] Backend API endpoint(y) vracející statistiky písní
 - [ ] Frontend — nahradit unicorn placeholder skutečným UI se
       statistikami/grafy napojeným na backend API
 - [ ] Později: automatický import přímo z Google Sheetu (ať se data nemusí

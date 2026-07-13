@@ -84,33 +84,42 @@ nespouští ho za něj.
         písní pro kontrolu/matchování při importu
       - `.gitignore` upraven o `*:Zone.Identifier` (Windows artefakt ze
         stahování souborů, nekomitovat)
-- [ ] **DALŠÍ KROK: Prisma + SQLite nastavení** (viz plán níže — ještě
-      nezačato, čeká se na pokyn uživatele)
-- [ ] Prisma schema: `Song`, `SongHistory`, `UnknownSong`
-- [ ] První migrace / SQLite soubor vygenerován
-- [ ] `PrismaModule` + `PrismaService` v NestJS, zaregistrováno v `AppModule`
-- [ ] Import dat z `backend/data/` do databáze (přes import skript, uživatel
-      ho spustí sám ve svém WSL terminálu)
-- [ ] Napojení Prismy na Turso pro produkci (Render)
+- [x] **Prisma + SQLite hotovo** (2026-07-13): schema `Song` / `SongHistory`
+      (FK na `Song`) / `UnknownSong`, migrace vytvořené a aplikované, lokální
+      DB soubor `backend/prisma/dev.db` (v `.gitignore`, necommitovaný)
+- [x] **Import dat hotov**: `backend/scripts/import-data.ts` (spouští se přes
+      `npm run import:data`) — načte `song-names-dictionary.txt` → naplní
+      `Song`, načte `songs-source-06-2026.xlsx` → pro každý řádek normalizuje
+      název (bez diakritiky, lowercase) a napáruje na `Song`; co se nenapáruje,
+      jde do `UnknownSong`. Po doplnění chybějících názvů do dictionary.txt a
+      re-importu: **103 písní, 583 řádků historie, 0 unknown**.
+- [ ] **DALŠÍ KROK: `PrismaModule` + `PrismaService` v NestJS**, zaregistrovat
+      v `AppModule` (zatím appka DB vůbec nepoužívá za běhu, jen import skript)
 - [ ] API endpoint(y) pro statistiky písní
+- [ ] Napojení Prismy na Turso pro produkci (Render)
 - [ ] Google Sheets integrace (zatím neřešeno, plánováno na později)
 
-## Plán práce — DB vrstva (další krok)
+## Zjištěné zádrhely při zakládání Prisma (pro příště)
 
-1. Nainstalovat `prisma` (dev) a `@prisma/client` (dependency)
-2. `npx prisma init --datasource-provider sqlite`
-3. Definovat schema.prisma:
-   - `Song` — `id`, `title`
-   - `SongHistory` — `id`, `date`, `songId` (FK → `Song`)
-   - `UnknownSong` — `id`, `date`, `rawText`
-4. `npx prisma migrate dev --name init` — vytvoří SQLite soubor + migraci
-5. Vytvořit `src/prisma/prisma.module.ts` a `src/prisma/prisma.service.ts`
-   (PrismaService extends PrismaClient, implementuje `OnModuleInit`)
-6. Zaregistrovat `PrismaModule` do `AppModule`, zkontrolovat že je vše
-   správně provázané a `nest build` prochází
+- `npx prisma init` defaultně nainstaluje **nejnovější Prisma (v7)**, která
+  pro SQLite vyžaduje "driver adapter" a generuje ESM klienta
+  (`import.meta.url`) — zbytečně komplikované pro tenhle jednoduchý projekt.
+  **Řešení: používáme Prisma 5** (`prisma`/`@prisma/client` `^5.22.0`),
+  klasický generator `provider = "prisma-client-js"`, žádný `prisma.config.ts`.
+- Prisma 5 vyžaduje `url = env("DATABASE_URL")` přímo v `datasource` bloku
+  ve `schema.prisma` (na rozdíl od v7, kde to šlo přes config soubor).
+- Relativní cesta v `DATABASE_URL="file:./dev.db"` (v `.env`) se resolvuje
+  **vůči složce, kde leží `schema.prisma`** (tzn. `prisma/dev.db`), ne vůči
+  `backend/` nebo cwd terminálu — snadno se splete.
+- Bash nástroj (Windows/Git Bash) neumí spustit `npx`/`npm` na UNC cestě
+  (`\\wsl.localhost\...`) — tyhle příkazy musí spouštět uživatel sám ve svém
+  WSL terminálu (viz pravidlo níže), Claude jen upravuje soubory.
 
 ## Budoucí kroky (zatím neimplementováno)
 
-- Google Sheets integrace — čtení dat o zpívaných písních
+- `PrismaModule`/`PrismaService` v NestJS (`PrismaService extends PrismaClient`,
+  `OnModuleInit`), zaregistrovat do `AppModule`
 - Endpointy / služby pro statistiky (nejčastější písně, historie podle data, ...)
-- Zpracování `UnknownSong` — flow na dohledání/přiřazení neznámých záznamů
+- Google Sheets integrace — čtení dat o zpívaných písních
+- Napojení produkční Prismy na Turso (env proměnné na Renderu už čekají)
+- Zpracování budoucích `UnknownSong` záznamů — flow na dohledání/přiřazení
