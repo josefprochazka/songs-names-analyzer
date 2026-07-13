@@ -77,6 +77,20 @@ produkci (Render) se napojí na Turso — kvůli nepersistentnímu disku na free
 hostingu. Tohle napojení v kódu (Prisma adaptér pro Turso) ještě není
 hotové, je to jeden z dalších kroků.
 
+### Poznámka: kde skutečně jsou data ted (2026-07-13)
+
+Naimportovaná data (103 písní, 583 řádků historie) existují **jen lokálně**,
+v jednom souboru `backend/prisma/dev.db` na disku vývojáře. Tenhle soubor:
+
+- **není na GitHubu** — je schválně v `.gitignore` (je to binární DB soubor,
+  ne zdrojový kód, necommituje se).
+- **není na Turso** — Turso databáze je založená, ale kód se na ni ještě
+  nepřipojuje (viz výše), takže je tam zatím prázdno.
+- **skutečná záloha** je zdrojová data v `backend/data/` (dictionary.txt +
+  xlsx), ta JSOU v gitu. Z nich se dá `dev.db` kdykoliv znovu vytvořit
+  příkazem `npm run import:data` (v `backend/`), i kdyby se lokální DB
+  soubor ztratil.
+
 ## Aktuální stav (k 2026-07-11, večer)
 
 - [x] Monorepo `songs-names-analyzer` na GitHubu
