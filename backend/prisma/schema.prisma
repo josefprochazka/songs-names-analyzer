@@ -1,0 +1,32 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Song {
+  id      Int           @id @default(autoincrement())
+  name    String        @unique
+  history SongHistory[]
+}
+
+model SongHistory {
+  id     Int      @id @default(autoincrement())
+  date   DateTime
+  songId Int
+  song   Song     @relation(fields: [songId], references: [id])
+}
+
+model UnknownSong {
+  id     Int      @id @default(autoincrement())
+  name   String
+  date   DateTime
+}

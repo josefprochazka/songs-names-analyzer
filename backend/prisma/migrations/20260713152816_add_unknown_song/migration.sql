@@ -1,0 +1,6 @@
+-- CreateTable
+CREATE TABLE "UnknownSong" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "name" TEXT NOT NULL,
+    "date" DATETIME NOT NULL
+);
