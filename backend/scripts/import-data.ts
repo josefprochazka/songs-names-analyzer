@@ -2,8 +2,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as XLSX from 'xlsx';
 import { PrismaClient } from '@prisma/client';
+import { createTursoAdapter } from '../src/prisma/turso-adapter';
 
-const prisma = new PrismaClient();
+const adapter = createTursoAdapter();
+const prisma = new PrismaClient(adapter ? { adapter } : undefined);
 
 const DICTIONARY_PATH = path.join(__dirname, '../data/song-names-dictionary.txt');
 const SOURCE_XLSX_PATH = path.join(__dirname, '../data/songs-source-06-2026.xlsx');
