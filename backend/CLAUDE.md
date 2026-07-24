@@ -108,6 +108,41 @@ nespouští ho za něj.
       `TURSO_AUTH_TOKEN` v prostředí příkazu). Data (103 písní, 583 řádků
       historie, 0 unknown) jsou naimportovaná v Turso stejně jako lokálně.
 - [ ] Google Sheets integrace (zatím neřešeno, plánováno na později)
+- [x] **Opraveny duplicity v `song-names-dictionary.txt`** (2026-07-24) —
+      "Základ můj"/"Základ Můj" a "Nemusím víc se bat"/"Nemusím víc se bát"
+      byly v číselníku dvakrát s jinou velikostí/diakritikou, takže vznikly
+      dvě samostatné `Song` položky pro tutéž píseň (jedna nesla celou
+      historii, druhá zůstala "duchem" s `0×`). Viz postup níže.
+
+## Postup: jak opravit/vyčistit data v `song-names-dictionary.txt`
+
+Import (`scripts/import-data.ts`) dělá jen **upsert** — nikdy nic nemaže.
+Když se v číselníku objeví stejná píseň dvakrát s jinak napsaným názvem
+(jiná velikost písmen, chybějící diakritika), vzniknou v `Song` dva
+samostatné řádky pro tutéž píseň — jeden s historií, druhý osiřelý s
+`0×` (protože `normalize()` v importu obě varianty sjednotí na stejný
+klíč, ale do DB je uloží zvlášť, protože `Song.name` je case-sensitive
+unique).
+
+Oprava (jednodušší než mazat konkrétní řádky v DB ručně):
+
+1. V `backend/data/song-names-dictionary.txt` smazat/opravit duplicitní
+   řádek, nechat jen jednu (správně napsanou) variantu názvu.
+2. **Vyprázdnit a znovu naimportovat lokálně:**
+   ```
+   npx prisma migrate reset --force
+   npm run import:data
+   ```
+3. **Vyprázdnit a znovu naimportovat na Turso** (Prisma Migrate na Turso
+   nefunguje, proto čisté SQL přes CLI):
+   ```
+   echo "DELETE FROM SongHistory; DELETE FROM UnknownSong; DELETE FROM Song;" | turso db shell songs-names-analyzer
+   TURSO_DATABASE_URL=$(turso db show songs-names-analyzer --url)
+   TURSO_AUTH_TOKEN=$(turso db tokens create songs-names-analyzer)
+   TURSO_DATABASE_URL="$TURSO_DATABASE_URL" TURSO_AUTH_TOKEN="$TURSO_AUTH_TOKEN" npm run import:data
+   ```
+4. Appka nepotřebuje redeploy — `GET /songs` čte z DB živě, stačí obnovit
+   stránku na Vercelu.
 
 ## Zádrhely při napojování na Turso (2026-07-24, pro příště)
 
