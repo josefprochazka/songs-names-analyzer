@@ -33,7 +33,7 @@ filesystému:
 ```
 
 (Pozn.: projekt byl 2026-07-11 sloučen s frontendem do jednoho monorepa
-`songs-names-analyzer` — viz `../README-CLAUDE.md` pro celkový přehled.)
+`songs-names-analyzer` — viz `../CLAUDE.md` pro celkový přehled.)
 
 Zjištěné problémy a jak je řešit:
 
@@ -65,7 +65,7 @@ nespouští ho za něj.
 ## Aktuální stav (k 2026-07-11, večer)
 
 - [x] Čistá kostra NestJS projektu, součást monorepa `songs-names-analyzer`
-- [x] Založen tento `README-CLAUDE.md`
+- [x] Založen tento `CLAUDE.md`
 - [x] **Nasazeno na Render** (free tier, root dir `backend`, auto-deploy z
       `main`) — `https://songs-names-analyzer.onrender.com`. Zatím jede jen
       holá kostra (defaultní "Hello World!" na `/`), žádná DB logika.
@@ -93,11 +93,74 @@ nespouští ho za něj.
       název (bez diakritiky, lowercase) a napáruje na `Song`; co se nenapáruje,
       jde do `UnknownSong`. Po doplnění chybějících názvů do dictionary.txt a
       re-importu: **103 písní, 583 řádků historie, 0 unknown**.
-- [ ] **DALŠÍ KROK: `PrismaModule` + `PrismaService` v NestJS**, zaregistrovat
-      v `AppModule` (zatím appka DB vůbec nepoužívá za běhu, jen import skript)
-- [ ] API endpoint(y) pro statistiky písní
-- [ ] Napojení Prismy na Turso pro produkci (Render)
+- [x] **`PrismaModule` + `PrismaService` v NestJS** (2026-07-24),
+      zaregistrováno v `AppModule`
+- [x] **`GET /songs` endpoint** (2026-07-24) — `SongsModule`/`SongsController`/
+      `SongsService`, vrací seznam písní seřazený podle počtu zazpívání
+      (`{ id, name, timesSung }`), CORS zapnuté v `main.ts`
+- [x] **Napojení Prismy na Turso pro produkci hotovo** (2026-07-24) —
+      `src/prisma/turso-adapter.ts` vytváří libSQL driver adapter
+      (`@prisma/adapter-libsql` + `@libsql/client`), použije se když je
+      nastavená `TURSO_DATABASE_URL` (produkce/Render), jinak se použije
+      normální lokální SQLite soubor přes `DATABASE_URL`. Stejná logika je
+      i v `scripts/import-data.ts`, takže import lze spustit jak proti
+      lokální DB, tak proti Turso (stačí nastavit `TURSO_DATABASE_URL`/
+      `TURSO_AUTH_TOKEN` v prostředí příkazu). Data (103 písní, 583 řádků
+      historie, 0 unknown) jsou naimportovaná v Turso stejně jako lokálně.
 - [ ] Google Sheets integrace (zatím neřešeno, plánováno na později)
+
+## Zádrhely při napojování na Turso (2026-07-24, pro příště)
+
+- **Prisma Migrate na Turso nefunguje přímo.** Migrace se musí aplikovat
+  ručně jako čisté SQL přes Turso CLI:
+  `turso db shell <db-name> < prisma/migrations/<slozka>/migration.sql`
+  (pro každou migraci zvlášť, v pořadí).
+- **Verze `@prisma/adapter-libsql` musí sedět na verzi `@prisma/client`/
+  `prisma`.** Instalace bez explicitní verze (`npm install
+  @prisma/adapter-libsql`) stáhla nejnovější v7.x, zatímco projekt má
+  Prisma `^5.22.0` — neslučitelné API (jiný export: `PrismaLibSql` v7 vs.
+  `PrismaLibSQL` v5, jiný tvar konstruktoru). Řešení: instalovat přesně
+  `@prisma/adapter-libsql@5.22.0` (sedí na `prisma`/`@prisma/client`
+  verzi v `package.json`).
+- **`@prisma/adapter-libsql@5.22.0` má peer dependency na starší
+  `@libsql/client`** (`^0.3.5` až `^0.8.0`). Musí se instalovat společně:
+  `npm install @libsql/client@0.8.1 @prisma/adapter-libsql@5.22.0`,
+  jinak `npm install` spadne na `ERESOLVE`.
+- **API verze 5.22.0**: `new PrismaLibSQL(client)` bere rovnou instanci
+  klienta z `@libsql/client` (`createClient({ url, authToken })`), ne
+  config objekt přímo (na rozdíl od novějších verzí adaptéru).
+- **`previewFeatures = ["driverAdapters"]`** musí být v `generator client`
+  bloku v `schema.prisma`, jinak `PrismaClientOptions` typ nezná
+  `adapter` a TS build padá.
+- **Render cachuje `node_modules` mezi buildy** → `npm install` často
+  vypíše jen "up to date" a nespustí postinstall hook `@prisma/client`
+  (ten normálně volá `prisma generate`). Výsledek: použije se starý
+  vygenerovaný client, co ještě neumí `previewFeatures`/`adapter`, a
+  TypeScript build padá s "Object literal may only specify known
+  properties". **Fix:** `"build": "prisma generate && nest build"` v
+  `package.json` (vynutí generování při každém buildu, bez ohledu na
+  cache).
+- **`nest build` omylem kompiloval i `backend/scripts/`** (protože ani
+  `tsconfig.json`, ani `tsconfig.build.json` nemají `include`/`rootDir`,
+  takže TS bere všechny `.ts` soubory pod `backend/`). Když
+  `scripts/import-data.ts` začal importovat z `src/prisma/...`, TS spočítal
+  společný kořen jako celé `backend/`, takže výstup skončil na
+  `dist/src/main.js` místo `dist/main.js` → `node dist/main` na Renderu
+  hlásilo `MODULE_NOT_FOUND`. **Fix:** přidat `"scripts"` do `exclude` v
+  `tsconfig.build.json`. (Tohle nejspíš byl skutečný důvod, proč appka na
+  Renderu tiše běžela na staré verzi bez Prismy od 13.7. — dřívější
+  deploye byly kategorizované jako selhání "while running", ne "while
+  building", ale šlo o stejnou `dist/main` chybu.)
+- **Auto-deploy na Renderu** je zapnutý ("On Commit") a GitHub App má
+  přístup k repu — není to problém s oprávněními. Historicky ale i tak
+  nebyl vidět žádný úspěšný redeploy po `04b93e3` (11.7.), protože každý
+  následující build/start padal (viz body výše) a Render tiše dál servíroval
+  poslední živou verzi. Po opravě `tsconfig.build.json` by auto-deploy měl
+  fungovat normálně.
+- Ve WSL Ubuntu nebyl nainstalovaný **Turso CLI** ani prohlížeč pro
+  `turso auth login` (chybí `xdg-open`) — řešení: `curl -sSfL
+  https://get.tur.so/install.sh | bash`, pak `source ~/.bashrc`, pak
+  `turso auth login --headless` (vypíše URL k otevření ručně v prohlížeči).
 
 ## Zjištěné zádrhely při zakládání Prisma (pro příště)
 

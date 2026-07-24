@@ -40,7 +40,7 @@ v Linuxové adresářové struktuře:
 strany viditelná jako `\\wsl.localhost\Ubuntu\home\josefprochazka\repos-ubuntu\...`)
 
 (Pozn.: projekt byl 2026-07-11 sloučen s backendem do jednoho monorepa
-`songs-names-analyzer` — viz `../README-CLAUDE.md` pro celkový přehled.)
+`songs-names-analyzer` — viz `../CLAUDE.md` pro celkový přehled.)
 
 Jak se v tomto prostředí správně pohybovat, aby nevznikaly chyby v cestách:
 
@@ -76,7 +76,7 @@ nespouští ho za něj.
 
 - [x] Čistá kostra React + TypeScript + Vite + ESLint, součást monorepa
       `songs-names-analyzer`
-- [x] Založen tento `README-CLAUDE.md`
+- [x] Založen tento `CLAUDE.md`
 - [x] **Nasazeno na Vercel** (free, root dir `frontend`, auto-deploy z
       `main` — push na GitHub → nový build během ~minuty)
 - [x] `App.tsx`/`App.css` přepsané na **dočasnou "hello wife" stránku**:
@@ -91,13 +91,23 @@ nespouští ho za něj.
       `.unicorn-emoji`, `.bounce-text`, `.hearts` v `App.css`. Ponaučení:
       při vlastním `font-size` v komponentě vždy nastavit i vlastní
       `line-height`, nespoléhat na zděděnou hodnotu z `:root`.
-- [ ] Skutečné UI pro statistiky/grafy (čeká na hotový backend + API)
+- [x] **Unicorn placeholder nahrazen skutečným seznamem písní** (2026-07-24)
+      — `App.tsx` fetchuje `GET {VITE_API_URL}/songs` a vypíše seznam
+      písní s počtem zazpívání (`song-name` + `song-count` v `App.css`).
+      Fallback `VITE_API_URL` je `http://localhost:3000` pro lokální vývoj.
+- [x] **Produkční env proměnná nastavená** — `VITE_API_URL` je ve Vercelu
+      nastavená na `https://songs-names-analyzer.onrender.com` (Settings →
+      Environment Variables → Production), ověřeno živě na
+      `songs-names-analyzer.vercel.app`.
+- [ ] Zatím jde jen o prostý seznam (řazený podle počtu zazpívání), ne
+      skutečné grafy/vizualizace — to je další krok, viz `../CLAUDE.md`.
 
 ## Plán práce — budoucí kroky
 
-1. Počkat, až bude hotová Prisma/DB vrstva a API endpointy v backendu.
-2. Nahradit unicorn placeholder skutečným UI: napojení na backend API,
-   zobrazení statistik a grafů (nejčastější písně, historie podle data,
-   přehled neznámých/nerozpoznaných záznamů — `UnknownSong`).
-3. Ověřit, že produkční frontend (Vercel) správně volá produkční backend
-   (Render) — bude potřeba nastavit backend URL jako env proměnnou.
+1. ~~Počkat na hotovou Prisma/DB vrstvu a API endpointy v backendu~~ hotovo
+2. ~~Nahradit unicorn placeholder základním seznamem napojeným na API~~
+   hotovo
+3. ~~Ověřit, že produkční frontend (Vercel) správně volá produkční backend
+   (Render)~~ hotovo
+4. **DALŠÍ KROK:** rozšířit seznam na skutečné UI se statistikami/grafy
+   (historie zpívání v čase, přehled `UnknownSong` záznamů apod.)

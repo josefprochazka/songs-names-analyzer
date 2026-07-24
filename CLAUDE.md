@@ -1,7 +1,7 @@
 # Claude Context — songs-names-analyzer (root / monorepo overview)
 
 Toto je nadřazený kontextový soubor pro celý projekt. Detailní kontext ke
-konkrétní části je v `backend/README-CLAUDE.md` a `frontend/README-CLAUDE.md`
+konkrétní části je v `backend/CLAUDE.md` a `frontend/CLAUDE.md`
 — tenhle soubor slouží k rychlému přehledu, jak spolu obě části souvisí, a
 k věcem, které se týkají projektu jako celku (repo struktura, nasazení).
 
@@ -15,10 +15,10 @@ jejich historii zpívání, frontend to vizualizuje.
 
 ```
 songs-names-analyzer/
-├── backend/    → NestJS + TypeScript + Prisma + SQLite (viz backend/README-CLAUDE.md)
+├── backend/    → NestJS + TypeScript + Prisma + SQLite (viz backend/CLAUDE.md)
 │   └── data/   → zálohovaná zdrojová data (CSV/xlsx + číselník názvů písní)
-├── frontend/   → React + TypeScript + Vite (viz frontend/README-CLAUDE.md)
-└── README-CLAUDE.md  → tento soubor
+├── frontend/   → React + TypeScript + Vite (viz frontend/CLAUDE.md)
+└── CLAUDE.md  → tento soubor
 ```
 
 Historie: projekt původně vznikl jako dva samostatné GitHub repozitáře
@@ -104,24 +104,37 @@ v jednom souboru `backend/prisma/dev.db` na disku vývojáře. Tenhle soubor:
       vyčištěný CSV/xlsx export (datum + píseň) + číselník správných názvů
       písní, obojí commitnuté v gitu jako trvalá záloha
 - [x] **Prisma + SQLite v backendu hotovo** (2026-07-13, viz
-      backend/README-CLAUDE.md pro detailní rozpis a zádrhely)
+      backend/CLAUDE.md pro detailní rozpis a zádrhely)
 - [x] **Import dat hotov** — 103 písní, 583 řádků historie, 0 unknown
       (`npm run import:data` v `backend/`)
-- [ ] **DALŠÍ KROK: `PrismaModule`/`PrismaService` v NestJS** + backend API
-      endpoint(y) vracející statistiky písní
-- [ ] Napojení Prismy na Turso v produkci
-- [ ] Frontend — nahradit unicorn placeholder skutečným UI se
-      statistikami/grafy napojeným na backend API
+- [x] **`PrismaModule`/`PrismaService` v NestJS** + backend endpoint
+      `GET /songs` vracející seznam písní s počtem zazpívání (2026-07-24)
+- [x] **Napojení Prismy na Turso v produkci hotovo** (2026-07-24, viz
+      backend/CLAUDE.md pro detailní rozpis a zádrhely) — backend na
+      Renderu teď čte/zapisuje do skutečné Turso databáze přes libSQL
+      driver adapter, data (103 písní, 583 řádků historie) tam naimportovaná
+- [x] **Frontend nahrazuje unicorn placeholder** — `App.tsx` teď fetchuje
+      `GET /songs` a vypisuje seznam písní s počty zazpívání (2026-07-24)
+- [x] **Ověřeno, že celé to (FE+BE+DB) funguje živě**: Vercel → Render →
+      Turso, viz `https://songs-names-analyzer.vercel.app` (2026-07-24)
 - [ ] Později: automatický import přímo z Google Sheetu (ať se data nemusí
       přidávat ručně)
+- [ ] Kosmetika: pár duplicit/překlepů v `song-names-dictionary.txt`
+      (např. "Základ Můj" vs "Základ můj", "Nemusím víc se bat" vs
+      "se bát") — stejná píseň vede na dva řádky v seznamu
+- [ ] Auto-deploy na Renderu historicky nefungoval spolehlivě kvůli buildu,
+      který padal (viz backend/CLAUDE.md) — teď by měl auto-deploy na push
+      fungovat, ale zatím to nebylo ověřeno na dalším běžném pushi
 
 ## Plán práce — pořadí dalších kroků
 
-1. Prisma + SQLite v backendu (schema `Song`/`SongHistory`/`UnknownSong`,
-   migrace, `PrismaService`/modul)
-2. Import CSV z `backend/data/` do databáze
-3. Backend endpoint(y) pro statistiky
-4. Napojit produkční Prismu na Turso (env proměnné už čekají na Renderu)
-5. Frontend UI se statistikami/grafy místo unicorn placeholderu
-6. Ověřit, že celé to (FE+BE+DB) funguje živě
-7. Automatický import z Google Sheetu (budoucnost)
+1. ~~Prisma + SQLite v backendu~~ hotovo
+2. ~~Import CSV z `backend/data/` do databáze~~ hotovo
+3. ~~Backend endpoint(y) pro statistiky~~ hotovo
+4. ~~Napojit produkční Prismu na Turso~~ hotovo
+5. ~~Frontend UI napojené na backend API~~ hotovo (zatím jen prostý seznam,
+   ne grafy)
+6. ~~Ověřit, že celé to (FE+BE+DB) funguje živě~~ hotovo
+7. **DALŠÍ KROK: skutečné UI se statistikami/grafy** místo prostého seznamu
+   (např. graf historie v čase, přehled `UnknownSong`)
+8. Automatický import z Google Sheetu (budoucnost)
