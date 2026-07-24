@@ -59,6 +59,31 @@
   color: inherit;
 }
 
+.hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #f3f6ff;
+  border: 1px solid #dce4fb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #444;
+}
+
+.hint-close {
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #888;
+  padding: 0 2px;
+}
+
 .songs-list {
   list-style: none;
   padding: 0;

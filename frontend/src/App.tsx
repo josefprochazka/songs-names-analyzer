@@ -29,6 +29,8 @@ const SORT_OPTIONS: { id: SortBy; label: string }[] = [
   { id: 'alpha', label: 'Abecedně' },
 ]
 
+const HINT_DISMISSED_KEY = 'kj-songs-hint-dismissed'
+
 function formatDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString('cs-CZ')
 }
@@ -85,6 +87,14 @@ function App() {
   const [tab, setTab] = useState<Tab>('all')
   const [sortBy, setSortBy] = useState<SortBy>('desc')
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [showHint, setShowHint] = useState(
+    () => localStorage.getItem(HINT_DISMISSED_KEY) !== 'true',
+  )
+
+  const dismissHint = () => {
+    localStorage.setItem(HINT_DISMISSED_KEY, 'true')
+    setShowHint(false)
+  }
 
   useEffect(() => {
     Promise.all([
@@ -184,13 +194,25 @@ function App() {
       {loading && <p>Načítám...</p>}
       {error && <p className="error">Nepodařilo se načíst data: {error}</p>}
 
+      {!loading && !error && showHint && (
+        <div className="hint">
+          <span>💡 Tip: klikni na píseň a uvidíš, kdy přesně se zpívala.</span>
+          <button className="hint-close" onClick={dismissHint} aria-label="Zavřít">
+            ×
+          </button>
+        </div>
+      )}
+
       {!loading && !error && (
         <ul className="songs-list">
           {visibleSongs.map((song) => (
             <li key={song.id} className="songs-list-item-wrapper">
               <button
                 className="songs-list-item"
-                onClick={() => setExpandedId(expandedId === song.id ? null : song.id)}
+                onClick={() => {
+                  setExpandedId(expandedId === song.id ? null : song.id)
+                  dismissHint()
+                }}
               >
                 <span className="song-name">{song.name}</span>
                 <span className="song-count">{song.dates.length}×</span>
