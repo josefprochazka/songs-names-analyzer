@@ -9,4 +9,9 @@ export class SongsController {
   findAll() {
     return this.songsService.findAll();
   }
+
+  @Get('date-range')
+  getDateRange() {
+    return this.songsService.getDateRange();
+  }
 }

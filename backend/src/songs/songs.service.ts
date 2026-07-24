@@ -18,4 +18,13 @@ export class SongsService {
       }))
       .sort((a, b) => b.timesSung - a.timesSung);
   }
+
+  async getDateRange() {
+    const { _min, _max } = await this.prisma.songHistory.aggregate({
+      _min: { date: true },
+      _max: { date: true },
+    });
+
+    return { from: _min.date, to: _max.date };
+  }
 }

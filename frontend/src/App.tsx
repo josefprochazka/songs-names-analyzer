@@ -9,20 +9,40 @@ interface Song {
   timesSung: number
 }
 
+interface DateRange {
+  from: string | null
+  to: string | null
+}
+
+function formatDate(isoDate: string): string {
+  return new Date(isoDate).toLocaleDateString('cs-CZ')
+}
+
 function App() {
   const [songs, setSongs] = useState<Song[]>([])
+  const [dateRange, setDateRange] = useState<DateRange | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`${API_URL}/songs`)
-      .then((res) => {
+    Promise.all([
+      fetch(`${API_URL}/songs`).then((res) => {
         if (!res.ok) {
           throw new Error(`Backend odpověděl chybou (${res.status})`)
         }
-        return res.json()
+        return res.json() as Promise<Song[]>
+      }),
+      fetch(`${API_URL}/songs/date-range`).then((res) => {
+        if (!res.ok) {
+          throw new Error(`Backend odpověděl chybou (${res.status})`)
+        }
+        return res.json() as Promise<DateRange>
+      }),
+    ])
+      .then(([songsData, dateRangeData]) => {
+        setSongs(songsData)
+        setDateRange(dateRangeData)
       })
-      .then((data: Song[]) => setSongs(data))
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
@@ -30,6 +50,11 @@ function App() {
   return (
     <div className="songs-page">
       <h1>Zpívané písně</h1>
+      {dateRange?.from && dateRange?.to && (
+        <p className="date-range">
+          {formatDate(dateRange.from)} – {formatDate(dateRange.to)}
+        </p>
+      )}
 
       {loading && <p>Načítám...</p>}
       {error && <p className="error">Nepodařilo se načíst data: {error}</p>}
