@@ -7,16 +7,16 @@ export class SongsService {
 
   async findAll() {
     const songs = await this.prisma.song.findMany({
-      include: { _count: { select: { history: true } } },
+      include: { history: { select: { date: true } } },
     });
 
     return songs
       .map((song) => ({
         id: song.id,
         name: song.name,
-        timesSung: song._count.history,
+        dates: song.history.map((entry) => entry.date.toISOString()),
       }))
-      .sort((a, b) => b.timesSung - a.timesSung);
+      .sort((a, b) => b.dates.length - a.dates.length);
   }
 
   async getDateRange() {

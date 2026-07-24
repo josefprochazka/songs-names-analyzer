@@ -19,17 +19,50 @@
   color: #d33;
 }
 
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  font: inherit;
+  padding: 6px 14px;
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+  color: #555;
+}
+
+.tab-active {
+  background: #222;
+  border-color: #222;
+  color: #fff;
+}
+
 .songs-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
+.songs-list-item-wrapper {
+  border-bottom: 1px solid #eee;
+}
+
 .songs-list-item {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  width: 100%;
   padding: 10px 0;
-  border-bottom: 1px solid #eee;
+  font: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
 }
 
 .song-name {
@@ -39,4 +72,46 @@
 .song-count {
   color: #888;
   font-variant-numeric: tabular-nums;
+}
+
+.song-timeline {
+  padding: 0 0 16px;
+}
+
+.song-timeline-axis {
+  position: relative;
+  height: 2px;
+  margin: 20px 6px 8px;
+  background: #eee;
+  border-radius: 1px;
+}
+
+.song-timeline-dot {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #3b6ef0;
+  border: 2px solid #fff;
+  transform: translate(-50%, -50%);
+}
+
+.song-timeline-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #888;
+  margin: 0 4px;
+}
+
+.song-dates-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 4px 12px;
+  font-size: 14px;
+  color: #555;
 }
