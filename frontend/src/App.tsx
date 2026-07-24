@@ -1,33 +1,49 @@
+import { useEffect, useState } from 'react'
 import './App.css'
 
-const sparkles = ['✨', '💖', '🌈', '⭐', '💫', '🦄', '💕', '🎀']
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+
+interface Song {
+  id: number
+  name: string
+  timesSung: number
+}
 
 function App() {
-  return (
-    <div className="unicorn-page">
-      <div className="sparkle-field">
-        {sparkles.map((emoji, i) => (
-          <span
-            key={i}
-            className="sparkle"
-            style={{
-              left: `${(i * 12.5) % 100}%`,
-              animationDelay: `${i * 0.4}s`,
-            }}
-          >
-            {emoji}
-          </span>
-        ))}
-      </div>
+  const [songs, setSongs] = useState<Song[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-      <div className="unicorn-card">
-        <div className="unicorn-emoji">🦄</div>
-        <h1 className="rainbow-text">Ahoj bejby!</h1>
-        <p className="bounce-text">
-          Brzy tady uvidíš data všech písní. <span className="blink">Těš se!</span>
-        </p>
-        <div className="hearts">💖 🌸 💜 🌸 💖</div>
-      </div>
+  useEffect(() => {
+    fetch(`${API_URL}/songs`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`Backend odpověděl chybou (${res.status})`)
+        }
+        return res.json()
+      })
+      .then((data: Song[]) => setSongs(data))
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  return (
+    <div className="songs-page">
+      <h1>Zpívané písně</h1>
+
+      {loading && <p>Načítám...</p>}
+      {error && <p className="error">Nepodařilo se načíst data: {error}</p>}
+
+      {!loading && !error && (
+        <ul className="songs-list">
+          {songs.map((song) => (
+            <li key={song.id} className="songs-list-item">
+              <span className="song-name">{song.name}</span>
+              <span className="song-count">{song.timesSung}×</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
