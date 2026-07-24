@@ -41,6 +41,24 @@
   color: #fff;
 }
 
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #555;
+}
+
+.sort-control select {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+}
+
 .songs-list {
   list-style: none;
   padding: 0;

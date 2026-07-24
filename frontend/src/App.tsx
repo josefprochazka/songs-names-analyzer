@@ -15,6 +15,7 @@ interface DateRange {
 }
 
 type Tab = 'all' | 'year' | 'month'
+type SortBy = 'desc' | 'asc' | 'alpha'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'all', label: 'Vše' },
@@ -22,13 +23,21 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'month', label: 'Poslední měsíc' },
 ]
 
+const SORT_OPTIONS: { id: SortBy; label: string }[] = [
+  { id: 'desc', label: 'Nejzpívanější' },
+  { id: 'asc', label: 'Nejméně zpívané' },
+  { id: 'alpha', label: 'Abecedně' },
+]
+
 function formatDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString('cs-CZ')
 }
 
-function cutoffFor(tab: Tab): Date | null {
-  if (tab === 'all') return null
-  const cutoff = new Date()
+// Cutoff is relative to the latest date actually present in the data,
+// not today's real date — the data can lag behind by weeks.
+function cutoffFor(tab: Tab, anchor: Date | null): Date | null {
+  if (tab === 'all' || !anchor) return null
+  const cutoff = new Date(anchor)
   if (tab === 'year') cutoff.setFullYear(cutoff.getFullYear() - 1)
   if (tab === 'month') cutoff.setMonth(cutoff.getMonth() - 1)
   return cutoff
@@ -74,6 +83,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('all')
+  const [sortBy, setSortBy] = useState<SortBy>('desc')
   const [expandedId, setExpandedId] = useState<number | null>(null)
 
   useEffect(() => {
@@ -99,24 +109,45 @@ function App() {
       .finally(() => setLoading(false))
   }, [])
 
-  const visibleSongs = useMemo(() => {
-    const cutoff = cutoffFor(tab)
+  const anchor = dateRange?.to ? new Date(dateRange.to) : null
 
-    return songs
+  const headerRange = useMemo(() => {
+    if (!dateRange?.from || !dateRange?.to) return null
+    if (tab === 'all') return { from: dateRange.from, to: dateRange.to }
+
+    const cutoff = cutoffFor(tab, anchor)
+    return cutoff ? { from: cutoff.toISOString(), to: dateRange.to } : null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange, tab])
+
+  const visibleSongs = useMemo(() => {
+    const cutoff = cutoffFor(tab, anchor)
+
+    const filtered = songs
       .map((song) => ({
         ...song,
         dates: cutoff ? song.dates.filter((date) => new Date(date) >= cutoff) : song.dates,
       }))
       .filter((song) => tab === 'all' || song.dates.length > 0)
-      .sort((a, b) => b.dates.length - a.dates.length)
-  }, [songs, tab])
+
+    if (sortBy === 'alpha') {
+      filtered.sort((a, b) => a.name.localeCompare(b.name, 'cs'))
+    } else if (sortBy === 'asc') {
+      filtered.sort((a, b) => a.dates.length - b.dates.length)
+    } else {
+      filtered.sort((a, b) => b.dates.length - a.dates.length)
+    }
+
+    return filtered
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songs, tab, sortBy])
 
   return (
     <div className="songs-page">
-      <h1>Zpívané písně</h1>
-      {dateRange?.from && dateRange?.to && (
+      <h1>Zpívané písně na KJ</h1>
+      {headerRange && (
         <p className="date-range">
-          {formatDate(dateRange.from)} – {formatDate(dateRange.to)}
+          {formatDate(headerRange.from)} – {formatDate(headerRange.to)}
         </p>
       )}
 
@@ -133,6 +164,21 @@ function App() {
             {label}
           </button>
         ))}
+      </div>
+
+      <div className="sort-control">
+        <label htmlFor="sort-select">Řadit podle:</label>
+        <select
+          id="sort-select"
+          value={sortBy}
+          onChange={(event) => setSortBy(event.target.value as SortBy)}
+        >
+          {SORT_OPTIONS.map(({ id, label }) => (
+            <option key={id} value={id}>
+              {label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {loading && <p>Načítám...</p>}
