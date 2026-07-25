@@ -130,6 +130,14 @@ v jednom souboru `backend/prisma/dev.db` na disku vývojáře. Tenhle soubor:
 - [ ] Auto-deploy na Renderu historicky nefungoval spolehlivě kvůli buildu,
       který padal (viz backend/CLAUDE.md) — teď by měl auto-deploy na push
       fungovat, ale zatím to nebylo ověřeno na dalším běžném pushi
+- [ ] **Flag na písně, co se nemají hrát** (nápad, 2026-07-25) — pár písní
+      by chtěl uživatel označit, aby se v appce zobrazily červeně (přehled
+      "tohle nehrát"). Řešení: nový sloupec `Song.doNotSing` (Boolean,
+      migrace + ruční aplikace na Turso jako u předchozích migrací),
+      promítnout do `GET /songs`, ve frontendu podmíněně obarvit název.
+      Otevřená otázka: nastavovat ručně přes SQL, nebo přes UI (checkbox/
+      tlačítko + update endpoint) — druhé zapadá do plánu formuláře na
+      přidávání písní výše. Zatím neimplementováno.
 
 ## Plán práce — pořadí dalších kroků
 
@@ -191,31 +199,53 @@ git (src/schema) + tahle záloha.
 - Doručení: posílat na e-mail pravidelně, ideálně při každém uložení
   změny v DB.
 
-**Návrh:**
+**Zjištění (2026-07-25): Turso na tohle má vestavěný nativní mechanismus,
+nemusíme si nic psát vlastního.** Je to SQLite-kompatibilní, takže funguje
+klasický SQLite `.dump` přístup + Turso k tomu navíc nabízí platformní
+zálohování:
 
-1. **Formát**: JSON export celé DB (`Song` + `SongHistory`) — jednodušší
-   a jednoznačnější než xlsx/CSV, žádné dvojznačnosti s oddělovači/
-   diakritikou co trápily `song-names-dictionary.txt`. Restore skript
-   bude obdoba `backend/scripts/import-data.ts`, jen čte tenhle JSON
-   místo xlsx+dictionary.
-2. **Trigger**: e-mail se zálohou po každém zápisu do `SongHistory`
-   (reálné až s formulářem z plánu výše — dokud se pořád importuje
-   ručně z xlsx, dává smysl poslat zálohu i po každém `import:data`).
-   Objem je u rodinného/osobního provozu malý (řádově desítky zápisů
-   měsíčně), takže e-mail při každé změně nebude spam. Zvážit i
-   pravidelný fallback (např. týdenní), pro jistotu kdyby něco změnilo
-   DB mimo appku (ruční SQL zásah na Turso apod.).
-3. **Odeslání e-mailu**: z NestJS backendu, např. Resend (má štědrý
-   free tier, jednoduché API) nebo Nodemailer přes Gmail SMTP app
-   password. Cílová adresa zatím uživatelův Gmail.
-4. **Restore flow**: `git clone` repa + spustit restore skript s
-   posledním záložním JSON souborem (z e-mailu) → znovu naplní
-   Turso/lokální DB. Analogické k dnešnímu `npm run import:data`,
-   jen jiný zdrojový formát.
+1. **`.dump` — ruční/skriptovatelná záloha (tohle použít teď):**
+   ```
+   turso db shell songs-names-analyzer .dump > backup.sql
+   ```
+   Vygeneruje čistý SQL skript (CREATE TABLE + INSERT příkazy pro `Song`
+   i `SongHistory`), který jde poslat jako přílohu mailem — malý textový
+   soubor, žádný vlastní export/import formát/skript navíc.
+2. **Restore — vytvořit novou DB a nahrát do ní dump:**
+   ```
+   turso db create nova-db
+   turso db shell nova-db < backup.sql
+   ```
+   Pak přepojit `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` na Renderu na
+   `nova-db` — appka běží se starými daty. Žádný vlastní restore skript
+   není potřeba (na rozdíl od dřívější JSON-export úvahy).
+3. **Turso Point-in-Time Restore (bonus, ne primární plán)** — Turso
+   umí i sám o sobě vytvořit novou DB z historického stavu jiné DB:
+   ```
+   turso db create nova-db --from-db songs-names-analyzer --timestamp <cas>
+   ```
+   Je to jako průběžná automatická záloha bez jakéhokoliv skriptování
+   z naší strany. Retenční okno ale záleží na tarifu — potvrzeno je
+   30 dní na placeném "Scaler" plánu a až 90 dní na vyšších tiers;
+   pro free tier (na kterém teď appka běží) nebylo v dokumentaci
+   nalezeno explicitní potvrzení, že PITR vůbec je součástí/jaké má
+   okno. **Nespoléhat se zatím na PITR jako jedinou zálohu** — `.dump`
+   zůstává primární plán, PITR je bonus, kdyby náhodou fungoval i na
+   free tieru.
+4. **Trigger/automatizace**: pravidelně (např. GitHub Actions cron,
+   stejně jako u Sheets sync plánu výše) spustit `.dump` příkaz a
+   poslat výsledek mailem. Frekvence: ideálně po každé změně dat
+   (jednou appka bude psát do DB rovnou přes formulář — viz plán výše),
+   do té doby stačí po každém ručním `import:data`. Objem u
+   rodinného/osobního provozu je malý, takže mail při každé změně
+   nebude spam.
+5. **Odeslání e-mailu**: z NestJS backendu nebo přímo z GitHub Actions
+   jobu, např. Resend (štědrý free tier, jednoduché API) nebo
+   Nodemailer přes Gmail SMTP app password. Cílová adresa zatím
+   uživatelův Gmail.
 
 Vztah k Sheets sync plánu výše: Sheet po zavedení sync bude taky fungovat
-jako jistá záloha, ale JSON e-mail záloha je jednodušší a nezávislá na
-Sheets API/struktuře Sheetu — spolehlivější cesta k rychlé obnově.
+jako jistá záloha, ale `.dump` je jednodušší, nezávislý na Sheets API a
+je to přesná bitová kopie celé DB (ne jen přepis dat do jiné struktury).
 
 Stav: **zatím jen nápad/diskuze (2026-07-25)**, ještě neimplementováno.
-Uživatel chce probrat ještě další část nápadu (upřesní příště).
