@@ -15,7 +15,8 @@ interface DateRange {
 }
 
 type Tab = 'all' | 'year' | 'month' | 'week'
-type SortBy = 'desc' | 'asc' | 'alpha'
+type SortField = 'count' | 'lastSung' | 'alpha'
+type SortDirection = 'desc' | 'asc'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'all', label: 'Vše' },
@@ -24,10 +25,15 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'week', label: 'Poslední týden' },
 ]
 
-const SORT_OPTIONS: { id: SortBy; label: string }[] = [
-  { id: 'desc', label: 'Nejzpívanější' },
-  { id: 'asc', label: 'Nejméně zpívané' },
+const SORT_FIELD_OPTIONS: { id: SortField; label: string }[] = [
+  { id: 'count', label: 'Počet zazpívání' },
+  { id: 'lastSung', label: 'Naposledy zpíváno' },
   { id: 'alpha', label: 'Abecedně' },
+]
+
+const SORT_DIRECTION_OPTIONS: { id: SortDirection; label: string }[] = [
+  { id: 'desc', label: 'Sestupně' },
+  { id: 'asc', label: 'Vzestupně' },
 ]
 
 const HINT_DISMISSED_KEY = 'kj-songs-hint-dismissed'
@@ -45,6 +51,19 @@ function cutoffFor(tab: Tab, anchor: Date | null): Date | null {
   if (tab === 'month') cutoff.setMonth(cutoff.getMonth() - 1)
   if (tab === 'week') cutoff.setDate(cutoff.getDate() - 7)
   return cutoff
+}
+
+// Songs never sung (or not sung within the selected period) sort as
+// oldest — they have no last-sung date to compare against.
+function lastSungTime(dates: string[]): number {
+  if (dates.length === 0) return -Infinity
+  return Math.max(...dates.map((date) => new Date(date).getTime()))
+}
+
+function compareByField(a: Song, b: Song, field: SortField): number {
+  if (field === 'alpha') return a.name.localeCompare(b.name, 'cs')
+  if (field === 'lastSung') return lastSungTime(a.dates) - lastSungTime(b.dates)
+  return a.dates.length - b.dates.length
 }
 
 function SongTimeline({ dates }: { dates: string[] }) {
@@ -87,7 +106,8 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('all')
-  const [sortBy, setSortBy] = useState<SortBy>('desc')
+  const [sortField, setSortField] = useState<SortField>('count')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [showHint, setShowHint] = useState(
     () => localStorage.getItem(HINT_DISMISSED_KEY) !== 'true',
@@ -142,17 +162,12 @@ function App() {
       }))
       .filter((song) => tab === 'all' || song.dates.length > 0)
 
-    if (sortBy === 'alpha') {
-      filtered.sort((a, b) => a.name.localeCompare(b.name, 'cs'))
-    } else if (sortBy === 'asc') {
-      filtered.sort((a, b) => a.dates.length - b.dates.length)
-    } else {
-      filtered.sort((a, b) => b.dates.length - a.dates.length)
-    }
+    filtered.sort((a, b) => compareByField(a, b, sortField))
+    if (sortDirection === 'desc') filtered.reverse()
 
     return filtered
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [songs, tab, sortBy])
+  }, [songs, tab, sortField, sortDirection])
 
   return (
     <div className="songs-page">
@@ -183,13 +198,28 @@ function App() {
         </div>
 
         <div className="control">
-          <label htmlFor="sort-select">Řadit podle:</label>
+          <label htmlFor="sort-field-select">Řadit podle:</label>
           <select
-            id="sort-select"
-            value={sortBy}
-            onChange={(event) => setSortBy(event.target.value as SortBy)}
+            id="sort-field-select"
+            value={sortField}
+            onChange={(event) => setSortField(event.target.value as SortField)}
           >
-            {SORT_OPTIONS.map(({ id, label }) => (
+            {SORT_FIELD_OPTIONS.map(({ id, label }) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="control">
+          <label htmlFor="sort-direction-select">Pořadí:</label>
+          <select
+            id="sort-direction-select"
+            value={sortDirection}
+            onChange={(event) => setSortDirection(event.target.value as SortDirection)}
+          >
+            {SORT_DIRECTION_OPTIONS.map(({ id, label }) => (
               <option key={id} value={id}>
                 {label}
               </option>
