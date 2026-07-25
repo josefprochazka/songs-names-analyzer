@@ -136,9 +136,12 @@
   list-style: none;
   margin: 12px 0 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 4px 12px;
+  border-top: 1px solid #eee;
   font-size: 14px;
   color: #555;
+}
+
+.song-dates-list li {
+  padding: 6px 4px;
+  border-bottom: 1px solid #eee;
 }
