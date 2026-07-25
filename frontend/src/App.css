@@ -19,38 +19,22 @@
   color: #d33;
 }
 
-.tabs {
+.controls {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
-.tab {
-  font: inherit;
-  padding: 6px 14px;
-  border: 1px solid #ddd;
-  border-radius: 999px;
-  background: none;
-  cursor: pointer;
-  color: #555;
-}
-
-.tab-active {
-  background: #222;
-  border-color: #222;
-  color: #fff;
-}
-
-.sort-control {
+.control {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 20px;
   font-size: 14px;
   color: #555;
 }
 
-.sort-control select {
+.control select {
   font: inherit;
   padding: 4px 8px;
   border: 1px solid #ddd;

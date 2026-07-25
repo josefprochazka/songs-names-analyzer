@@ -14,13 +14,14 @@ interface DateRange {
   to: string | null
 }
 
-type Tab = 'all' | 'year' | 'month'
+type Tab = 'all' | 'year' | 'month' | 'week'
 type SortBy = 'desc' | 'asc' | 'alpha'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'all', label: 'Vše' },
   { id: 'year', label: 'Poslední rok' },
   { id: 'month', label: 'Poslední měsíc' },
+  { id: 'week', label: 'Poslední týden' },
 ]
 
 const SORT_OPTIONS: { id: SortBy; label: string }[] = [
@@ -42,6 +43,7 @@ function cutoffFor(tab: Tab, anchor: Date | null): Date | null {
   const cutoff = new Date(anchor)
   if (tab === 'year') cutoff.setFullYear(cutoff.getFullYear() - 1)
   if (tab === 'month') cutoff.setMonth(cutoff.getMonth() - 1)
+  if (tab === 'week') cutoff.setDate(cutoff.getDate() - 7)
   return cutoff
 }
 
@@ -136,7 +138,7 @@ function App() {
     const filtered = songs
       .map((song) => ({
         ...song,
-        dates: cutoff ? song.dates.filter((date) => new Date(date) >= cutoff) : song.dates,
+        dates: cutoff ? song.dates.filter((date) => new Date(date) > cutoff) : song.dates,
       }))
       .filter((song) => tab === 'all' || song.dates.length > 0)
 
@@ -161,34 +163,39 @@ function App() {
         </p>
       )}
 
-      <div className="tabs">
-        {TABS.map(({ id, label }) => (
-          <button
-            key={id}
-            className={id === tab ? 'tab tab-active' : 'tab'}
-            onClick={() => {
-              setTab(id)
+      <div className="controls">
+        <div className="control">
+          <label htmlFor="period-select">Období:</label>
+          <select
+            id="period-select"
+            value={tab}
+            onChange={(event) => {
+              setTab(event.target.value as Tab)
               setExpandedId(null)
             }}
           >
-            {label}
-          </button>
-        ))}
-      </div>
+            {TABS.map(({ id, label }) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-      <div className="sort-control">
-        <label htmlFor="sort-select">Řadit podle:</label>
-        <select
-          id="sort-select"
-          value={sortBy}
-          onChange={(event) => setSortBy(event.target.value as SortBy)}
-        >
-          {SORT_OPTIONS.map(({ id, label }) => (
-            <option key={id} value={id}>
-              {label}
-            </option>
-          ))}
-        </select>
+        <div className="control">
+          <label htmlFor="sort-select">Řadit podle:</label>
+          <select
+            id="sort-select"
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value as SortBy)}
+          >
+            {SORT_OPTIONS.map(({ id, label }) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {loading && <p>Načítám...</p>}
