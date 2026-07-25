@@ -14,9 +14,15 @@ interface DateRange {
   to: string | null
 }
 
+type View = 'stats' | 'songbook'
 type Tab = 'all' | 'year' | 'month' | 'week'
 type SortField = 'count' | 'lastSung' | 'alpha'
 type SortDirection = 'desc' | 'asc'
+
+const VIEWS: { id: View; label: string }[] = [
+  { id: 'stats', label: 'Statistiky' },
+  { id: 'songbook', label: 'Zpěvník' },
+]
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'all', label: 'Vše' },
@@ -66,6 +72,61 @@ function compareByField(a: Song, b: Song, field: SortField): number {
   return a.dates.length - b.dates.length
 }
 
+function lastSungLabel(dates: string[]): string {
+  const time = lastSungTime(dates)
+  return Number.isFinite(time) ? formatDate(new Date(time).toISOString()) : 'nikdy'
+}
+
+const COMBINING_DIACRITICS = new RegExp('[\\u0300-\\u036f]', 'g')
+
+function normalizeForSearch(text: string): string {
+  return text.normalize('NFD').replace(COMBINING_DIACRITICS, '').toLowerCase().trim()
+}
+
+function Songbook({ songs }: { songs: Song[] }) {
+  const [query, setQuery] = useState('')
+  const [copiedId, setCopiedId] = useState<number | null>(null)
+
+  const visible = useMemo(() => {
+    const normalizedQuery = normalizeForSearch(query)
+    return songs
+      .filter((song) => normalizeForSearch(song.name).includes(normalizedQuery))
+      .sort((a, b) => a.name.localeCompare(b.name, 'cs'))
+  }, [songs, query])
+
+  const copyName = (song: Song) => {
+    navigator.clipboard.writeText(song.name).then(() => {
+      setCopiedId(song.id)
+      setTimeout(() => setCopiedId((current) => (current === song.id ? null : current)), 1500)
+    })
+  }
+
+  return (
+    <>
+      <input
+        type="text"
+        className="search-input"
+        placeholder="Hledat píseň…"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+
+      {visible.length === 0 && <p>Žádná píseň nenalezena.</p>}
+
+      <ul className="songbook-list">
+        {visible.map((song) => (
+          <li key={song.id} className="songbook-list-item">
+            <span className="song-name">{song.name}</span>
+            <button className="copy-button" onClick={() => copyName(song)}>
+              {copiedId === song.id ? 'Zkopírováno ✓' : 'Kopírovat'}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
 function SongTimeline({ dates }: { dates: string[] }) {
   const sorted = [...dates].sort()
   const first = new Date(sorted[0]).getTime()
@@ -105,6 +166,7 @@ function App() {
   const [dateRange, setDateRange] = useState<DateRange | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<View>('stats')
   const [tab, setTab] = useState<Tab>('all')
   const [sortField, setSortField] = useState<SortField>('count')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
@@ -171,94 +233,112 @@ function App() {
 
   return (
     <div className="songs-page">
-      <h1>Zpívané písně na KJ</h1>
-      {headerRange && (
-        <p className="date-range">
-          {formatDate(headerRange.from)} – {formatDate(headerRange.to)}
-        </p>
-      )}
+      <h1>Písně na KJ</h1>
 
-      <div className="controls">
-        <div className="control">
-          <label htmlFor="period-select">Období:</label>
-          <select
-            id="period-select"
-            value={tab}
-            onChange={(event) => {
-              setTab(event.target.value as Tab)
-              setExpandedId(null)
-            }}
+      <div className="view-nav">
+        {VIEWS.map(({ id, label }) => (
+          <button
+            key={id}
+            className={id === view ? 'view-tab view-tab-active' : 'view-tab'}
+            onClick={() => setView(id)}
           >
-            {TABS.map(({ id, label }) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="control">
-          <label htmlFor="sort-field-select">Řadit podle:</label>
-          <select
-            id="sort-field-select"
-            value={sortField}
-            onChange={(event) => setSortField(event.target.value as SortField)}
-          >
-            {SORT_FIELD_OPTIONS.map(({ id, label }) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="control">
-          <label htmlFor="sort-direction-select">Pořadí:</label>
-          <select
-            id="sort-direction-select"
-            value={sortDirection}
-            onChange={(event) => setSortDirection(event.target.value as SortDirection)}
-          >
-            {SORT_DIRECTION_OPTIONS.map(({ id, label }) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
+            {label}
+          </button>
+        ))}
       </div>
 
       {loading && <p>Načítám...</p>}
       {error && <p className="error">Nepodařilo se načíst data: {error}</p>}
 
-      {!loading && !error && showHint && (
-        <div className="hint">
-          <span>💡 Tip: klikni na píseň a uvidíš, kdy přesně se zpívala.</span>
-          <button className="hint-close" onClick={dismissHint} aria-label="Zavřít">
-            ×
-          </button>
-        </div>
-      )}
+      {!loading && !error && view === 'stats' && (
+        <>
+          {headerRange && (
+            <p className="date-range">
+              {formatDate(headerRange.from)} – {formatDate(headerRange.to)}
+            </p>
+          )}
 
-      {!loading && !error && (
-        <ul className="songs-list">
-          {visibleSongs.map((song) => (
-            <li key={song.id} className="songs-list-item-wrapper">
-              <button
-                className="songs-list-item"
-                onClick={() => {
-                  setExpandedId(expandedId === song.id ? null : song.id)
-                  dismissHint()
+          <div className="controls">
+            <div className="control">
+              <label htmlFor="period-select">Období:</label>
+              <select
+                id="period-select"
+                value={tab}
+                onChange={(event) => {
+                  setTab(event.target.value as Tab)
+                  setExpandedId(null)
                 }}
               >
-                <span className="song-name">{song.name}</span>
-                <span className="song-count">{song.dates.length}×</span>
+                {TABS.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="control">
+              <label htmlFor="sort-field-select">Řadit podle:</label>
+              <select
+                id="sort-field-select"
+                value={sortField}
+                onChange={(event) => setSortField(event.target.value as SortField)}
+              >
+                {SORT_FIELD_OPTIONS.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="control">
+              <label htmlFor="sort-direction-select">Pořadí:</label>
+              <select
+                id="sort-direction-select"
+                value={sortDirection}
+                onChange={(event) => setSortDirection(event.target.value as SortDirection)}
+              >
+                {SORT_DIRECTION_OPTIONS.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {showHint && (
+            <div className="hint">
+              <span>💡 Tip: klikni na píseň a uvidíš, kdy přesně se zpívala.</span>
+              <button className="hint-close" onClick={dismissHint} aria-label="Zavřít">
+                ×
               </button>
-              {expandedId === song.id && <SongTimeline dates={song.dates} />}
-            </li>
-          ))}
-        </ul>
+            </div>
+          )}
+
+          <ul className="songs-list">
+            {visibleSongs.map((song) => (
+              <li key={song.id} className="songs-list-item-wrapper">
+                <button
+                  className="songs-list-item"
+                  onClick={() => {
+                    setExpandedId(expandedId === song.id ? null : song.id)
+                    dismissHint()
+                  }}
+                >
+                  <span className="song-name">{song.name}</span>
+                  <span className="song-last-sung">Naposledy zpíváno: {lastSungLabel(song.dates)}</span>
+                  <span className="song-count">{song.dates.length}×</span>
+                </button>
+                {expandedId === song.id && <SongTimeline dates={song.dates} />}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
+
+      {!loading && !error && view === 'songbook' && <Songbook songs={songs} />}
     </div>
   )
 }

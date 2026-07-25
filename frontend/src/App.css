@@ -19,6 +19,70 @@
   color: #d33;
 }
 
+.view-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.view-tab {
+  font: inherit;
+  padding: 6px 14px;
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+  color: #555;
+}
+
+.view-tab-active {
+  background: #222;
+  border-color: #222;
+  color: #fff;
+}
+
+.search-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.songbook-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.songbook-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.copy-button {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.copy-button:hover {
+  background: #f5f5f5;
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;
@@ -80,8 +144,8 @@
 
 .songs-list-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 16px;
   width: 100%;
   padding: 10px 0;
   font: inherit;
@@ -93,10 +157,18 @@
 }
 
 .song-name {
+  flex: 1;
   text-align: left;
 }
 
+.song-last-sung {
+  flex-shrink: 0;
+  color: #888;
+  font-size: 13px;
+}
+
 .song-count {
+  flex-shrink: 0;
   color: #888;
   font-variant-numeric: tabular-nums;
 }
