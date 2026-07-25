@@ -117,8 +117,13 @@ v jednom souboru `backend/prisma/dev.db` na disku vývojáře. Tenhle soubor:
       `GET /songs` a vypisuje seznam písní s počty zazpívání (2026-07-24)
 - [x] **Ověřeno, že celé to (FE+BE+DB) funguje živě**: Vercel → Render →
       Turso, viz `https://songs-names-analyzer.vercel.app` (2026-07-24)
-- [ ] Později: automatický import přímo z Google Sheetu (ať se data nemusí
-      přidávat ručně)
+- [x] **Statistiky/Zpěvník UI hotovo** (2026-07-25) — dvě záložky:
+      Statistiky (filtr období vč. posledního týdne, řazení podle počtu/
+      naposledy zpíváno/abecedy, časová osa historie po rozkliknutí písně)
+      a Zpěvník (abecední seznam všech písní ze zpěvníku KJ, vyhledávání
+      bez ohledu na diakritiku, tlačítko na zkopírování přesného názvu).
+- [ ] Google Sheets integrace — **plán obrácený oproti původní myšlence**,
+      viz sekce "Plán: přidávání písní přes appku + sync do Sheets" níže.
 - [ ] Kosmetika: pár duplicit/překlepů v `song-names-dictionary.txt`
       (např. "Základ Můj" vs "Základ můj", "Nemusím víc se bat" vs
       "se bát") — stejná píseň vede na dva řádky v seznamu
@@ -135,6 +140,82 @@ v jednom souboru `backend/prisma/dev.db` na disku vývojáře. Tenhle soubor:
 5. ~~Frontend UI napojené na backend API~~ hotovo (zatím jen prostý seznam,
    ne grafy)
 6. ~~Ověřit, že celé to (FE+BE+DB) funguje živě~~ hotovo
-7. **DALŠÍ KROK: skutečné UI se statistikami/grafy** místo prostého seznamu
-   (např. graf historie v čase, přehled `UnknownSong`)
-8. Automatický import z Google Sheetu (budoucnost)
+7. ~~Skutečné UI se statistikami~~ hotovo (2026-07-25) — Statistiky +
+   Zpěvník záložky, viz výše
+8. **DALŠÍ KROK: přidávání písní přes appku + sync do Google Sheets**
+   (viz sekce níže)
+
+## Plán: přidávání písní přes appku + sync do Sheets
+
+Původní myšlenka byla: appka čte z Google Sheetu (lidé zapisují do Sheetu,
+appka to v noci naimportuje). Zavrhnuto — zdrojový Sheet je nepořádný (3
+sloupce písní, nekonzistentní oddělovače), parsování by bylo křehké a řešilo
+by se to samé co dřív s `song-names-dictionary.txt`.
+
+**Nový plán (obrácený směr toku dat):**
+
+1. Appka dostane formulář na přidání záznamu (datum + výběr písně).
+   Výběr písně **není volný text** — je to autocomplete/dropdown ze
+   stávajícího seznamu písní (stejná data co Zpěvník), takže odpadá
+   celý problém s překlepy/neznámými písněmi. Appka se tím stává
+   zdrojem pravdy místo Sheetu.
+   - Pokud píseň v seznamu ještě není, jde ji rovnou z formuláře
+     založit jako novou (dostane `id`, od té chvíle se nabízí v
+     autocomplete i ostatním, sbírá si vlastní historii dat zpívání).
+     `song-names-dictionary.txt` tím přestává být ručně udržovaný
+     zdroj pravdy — Zpěvník roste organicky přímo z používání appky.
+2. Backend endpoint uloží záznam rovnou do Turso (real-time, žádný
+   import skript).
+3. Zápis se promítne i do Google Sheetu přes Sheets API (`googleapis`
+   balíček, service account s právem editace na konkrétní Sheet) —
+   Sheet se stává jen zrcadlem/zálohou, appka do něj píše, nečte z něj.
+   Řešit: automaticky při každém přidání vs. tlačítko "Synchronizovat"
+   (asi obojí — auto sync + ruční tlačítko jako pojistka).
+4. Jednorázový setup: založit Google Cloud service account, nasdílet
+   mu cílový Sheet s právem na zápis, credentials uložit jako env
+   proměnná na Renderu (podobně jako `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`).
+
+Stav: **zatím jen nápad/diskuze (2026-07-25)**, ještě neimplementováno.
+
+## Plán: záloha dat (DB backup + restore)
+
+Motivace: teď je reálná záloha dat `backend/data/` v gitu (xlsx + dictionary).
+Až appka přestane číst ze Sheetu a stane se zdrojem pravdy (viz plán výše),
+tahle záloha zestárne a přestane sedět s obsahem DB. Potřeba nezávislá
+záloha, ze které jde appku "znovu nahodit jako by se nic nestalo" — stačí
+git (src/schema) + tahle záloha.
+
+**Požadavky (zadání uživatele, 2026-07-25):**
+- Obsahuje: seznam všech písní + celou historii zpívání (datum + píseň).
+- Formát: jakýkoliv, hlavně ať jde rychle zase nahodit/refreshnout.
+- Doručení: posílat na e-mail pravidelně, ideálně při každém uložení
+  změny v DB.
+
+**Návrh:**
+
+1. **Formát**: JSON export celé DB (`Song` + `SongHistory`) — jednodušší
+   a jednoznačnější než xlsx/CSV, žádné dvojznačnosti s oddělovači/
+   diakritikou co trápily `song-names-dictionary.txt`. Restore skript
+   bude obdoba `backend/scripts/import-data.ts`, jen čte tenhle JSON
+   místo xlsx+dictionary.
+2. **Trigger**: e-mail se zálohou po každém zápisu do `SongHistory`
+   (reálné až s formulářem z plánu výše — dokud se pořád importuje
+   ručně z xlsx, dává smysl poslat zálohu i po každém `import:data`).
+   Objem je u rodinného/osobního provozu malý (řádově desítky zápisů
+   měsíčně), takže e-mail při každé změně nebude spam. Zvážit i
+   pravidelný fallback (např. týdenní), pro jistotu kdyby něco změnilo
+   DB mimo appku (ruční SQL zásah na Turso apod.).
+3. **Odeslání e-mailu**: z NestJS backendu, např. Resend (má štědrý
+   free tier, jednoduché API) nebo Nodemailer přes Gmail SMTP app
+   password. Cílová adresa zatím uživatelův Gmail.
+4. **Restore flow**: `git clone` repa + spustit restore skript s
+   posledním záložním JSON souborem (z e-mailu) → znovu naplní
+   Turso/lokální DB. Analogické k dnešnímu `npm run import:data`,
+   jen jiný zdrojový formát.
+
+Vztah k Sheets sync plánu výše: Sheet po zavedení sync bude taky fungovat
+jako jistá záloha, ale JSON e-mail záloha je jednodušší a nezávislá na
+Sheets API/struktuře Sheetu — spolehlivější cesta k rychlé obnově.
+
+Stav: **zatím jen nápad/diskuze (2026-07-25)**, ještě neimplementováno.
+Uživatel chce probrat ještě další část nápadu (upřesní příště).
