@@ -41,6 +41,12 @@
   color: #fff;
 }
 
+.view-description {
+  color: #888;
+  font-size: 14px;
+  margin: 0 0 20px;
+}
+
 .search-input {
   display: block;
   width: 100%;

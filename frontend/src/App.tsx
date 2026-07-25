@@ -19,9 +19,18 @@ type Tab = 'all' | 'year' | 'month' | 'week'
 type SortField = 'count' | 'lastSung' | 'alpha'
 type SortDirection = 'desc' | 'asc'
 
-const VIEWS: { id: View; label: string }[] = [
-  { id: 'stats', label: 'Statistiky' },
-  { id: 'songbook', label: 'Zpěvník' },
+const VIEWS: { id: View; label: string; description: string }[] = [
+  {
+    id: 'stats',
+    label: 'Statistiky',
+    description:
+      'Přehled, co se kdy hrálo. Pomůže najít píseň, která se dlouho nezpívala, nebo ukázat, co se hraje často a kdy.',
+  },
+  {
+    id: 'songbook',
+    label: 'Zpěvník',
+    description: 'Seznam všech písní ze zpěvníku KJ — najdi přesný název a zkopíruj si ho.',
+  },
 ]
 
 const TABS: { id: Tab; label: string }[] = [
@@ -246,6 +255,8 @@ function App() {
           </button>
         ))}
       </div>
+
+      <p className="view-description">{VIEWS.find((v) => v.id === view)?.description}</p>
 
       {loading && <p>Načítám...</p>}
       {error && <p className="error">Nepodařilo se načíst data: {error}</p>}
