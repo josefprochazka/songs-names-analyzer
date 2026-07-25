@@ -24,7 +24,7 @@ const VIEWS: { id: View; label: string; description: string }[] = [
     id: 'stats',
     label: 'Statistiky',
     description:
-      'Přehled, co se kdy hrálo. Pomůže najít píseň, která se dlouho nezpívala, nebo ukázat, co se hraje často a kdy.',
+      'Přehled, co se kdy hrálo. Pomůže najít píseň, která se dlouho nezpívala, nebo ukázat, co se hraje často a kdy. Klikni na píseň a uvidíš, kdy přesně se zpívala.',
   },
   {
     id: 'songbook',
