@@ -281,7 +281,7 @@ function App() {
   const [dateRange, setDateRange] = useState<DateRange | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [view, setView] = useState<View>('stats')
+  const [view, setView] = useState<View>('overview')
   const [tab, setTab] = useState<Tab>('all')
   const [sortField, setSortField] = useState<SortField>('count')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
