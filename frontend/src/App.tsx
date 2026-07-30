@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
@@ -14,22 +14,28 @@ interface DateRange {
   to: string | null
 }
 
-type View = 'stats' | 'songbook'
+type View = 'stats' | 'songbook' | 'overview'
 type Tab = 'all' | 'year' | 'month' | 'week'
 type SortField = 'count' | 'lastSung' | 'alpha'
 type SortDirection = 'desc' | 'asc'
 
 const VIEWS: { id: View; label: string; description: string }[] = [
   {
+    id: 'overview',
+    label: 'Přehled hraní',
+    description:
+      'Přehled podle data — co se kdy zpívalo. Klikni na píseň a uvidíš, kdy se zpívala v průběhu.',
+  },
+  {
+    id: 'songbook',
+    label: 'Seznam písní',
+    description: 'Seznam všech písní ze zpěvníku KJ — najdi přesný název a zkopíruj si ho.',
+  },
+  {
     id: 'stats',
     label: 'Statistiky',
     description:
       'Přehled, co se kdy hrálo. Pomůže najít píseň, která se dlouho nezpívala, nebo ukázat, co se hraje často a kdy. Klikni na píseň a uvidíš, kdy přesně se zpívala.',
-  },
-  {
-    id: 'songbook',
-    label: 'Zpěvník',
-    description: 'Seznam všech písní ze zpěvníku KJ — najdi přesný název a zkopíruj si ho.',
   },
 ]
 
@@ -166,6 +172,106 @@ function SongTimeline({ dates }: { dates: string[] }) {
           <li key={i}>{formatDate(date)}</li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+interface DateGroup {
+  label: string
+  sortKey: number
+  songs: Song[]
+}
+
+// Grouped by the same formatted label used everywhere else in the app, so a
+// song's occurrences always line up with the day they're displayed under.
+function groupSongsByDate(songs: Song[]): DateGroup[] {
+  const groups = new Map<string, DateGroup>()
+
+  for (const song of songs) {
+    for (const date of song.dates) {
+      const label = formatDate(date)
+      const group = groups.get(label)
+      if (group) {
+        group.songs.push(song)
+      } else {
+        groups.set(label, { label, sortKey: new Date(date).getTime(), songs: [song] })
+      }
+    }
+  }
+
+  return [...groups.values()]
+}
+
+function PlayedOverview({ songs }: { songs: Song[] }) {
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  const [dateSort, setDateSort] = useState<SortDirection>('desc')
+  const groups = useMemo(() => groupSongsByDate(songs), [songs])
+
+  const sortedGroups = useMemo(() => {
+    const direction = dateSort === 'asc' ? 1 : -1
+    return [...groups].sort((a, b) => (a.sortKey - b.sortKey) * direction)
+  }, [groups, dateSort])
+
+  return (
+    <div className="overview-wrapper" onClick={() => setExpandedKey(null)}>
+      <table className="overview-table">
+        <thead>
+          <tr>
+            <th
+              className="overview-sortable"
+              onClick={() => setDateSort((current) => (current === 'asc' ? 'desc' : 'asc'))}
+            >
+              Datum {dateSort === 'asc' ? '↑' : '↓'}
+            </th>
+            <th>Písně</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedGroups.map((group) => {
+            const expandedSong = group.songs.find(
+              (song) => `${group.label}-${song.id}` === expandedKey,
+            )
+
+            return (
+              <Fragment key={group.label}>
+                <tr>
+                  <td className="overview-date">{group.label}</td>
+                  <td className="overview-songs">
+                    {group.songs.map((song, i) => {
+                      const key = `${group.label}-${song.id}`
+                      return (
+                        <span key={song.id}>
+                          <button
+                            className={
+                              expandedKey === key
+                                ? 'overview-song overview-song-active'
+                                : 'overview-song'
+                            }
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setExpandedKey((current) => (current === key ? null : key))
+                            }}
+                          >
+                            {song.name}
+                          </button>
+                          {i < group.songs.length - 1 && ', '}
+                        </span>
+                      )
+                    })}
+                  </td>
+                </tr>
+                {expandedSong && (
+                  <tr className="overview-expanded-row">
+                    <td colSpan={2}>
+                      <SongTimeline dates={expandedSong.dates} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -350,6 +456,8 @@ function App() {
       )}
 
       {!loading && !error && view === 'songbook' && <Songbook songs={songs} />}
+
+      {!loading && !error && view === 'overview' && <PlayedOverview songs={songs} />}
     </div>
   )
 }
