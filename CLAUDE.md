@@ -248,4 +248,35 @@ Vztah k Sheets sync plánu výše: Sheet po zavedení sync bude taky fungovat
 jako jistá záloha, ale `.dump` je jednodušší, nezávislý na Sheets API a
 je to přesná bitová kopie celé DB (ne jen přepis dat do jiné struktury).
 
-Stav: **zatím jen nápad/diskuze (2026-07-25)**, ještě neimplementováno.
+### Realizace (2026-08-26) — odchylka od původního plánu výše
+
+Místo `.dump` (bod 1 výše) implementován **JSON export** a místo mailu
+(bod 5 výše) implementován **commit zálohy zpátky do repa** — uživatel
+nechtěl generovat/ukládat Gmail App Password ke svému osobnímu účtu, tak
+se místo mailu backup prostě commitne do gitu (appka i data pak žijí na
+stejném "bezpečném" místě, žádné mailové heslo není potřeba):
+
+- `backend/scripts/backup.ts` (`npm run backup` v `backend/`) — připojí se
+  přes stejný `createTursoAdapter()` co `import-data.ts`, vytáhne `Song` +
+  `SongHistory` přes Prisma, uloží jako jeden JSON soubor (cesta jako
+  argument, default `backend/backup.json`, ten je v gitignore — jen pro
+  ruční ad-hoc spuštění).
+- `.github/workflows/backup.yml` — běží jednou týdně (pondělí 06:00 UTC) +
+  jde spustit ručně tlačítkem ("Run workflow" v GitHub Actions). Spustí
+  `npm run backup` s výstupem do `backend/backups/songs-backup-<datum>.json`
+  a pak ten soubor **commitne a pushne zpátky do repa** přes
+  `stefanzweifel/git-auto-commit-action` (potřebuje `permissions: contents:
+  write` ve workflow, používá vestavěný `GITHUB_TOKEN`, žádný extra secret).
+- `backend/backups/` — složka s týdenními zálohami, commitované přímo do
+  gitu (`.gitkeep` pro založení prázdné složky).
+- **Restore skript zatím záměrně chybí** — zatím není potřeba, záloha slouží
+  jen jako pojistka "pro případ, že by vše spadlo". Až bude potřeba, obnova
+  je ruční (JSON → insert zpátky do prázdné Turso DB).
+
+**Vyžaduje ruční setup uživatelem (GitHub repo → Settings → Secrets and
+variables → Actions), nejde udělat z kódu:**
+- `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` — zkopírovat stejné hodnoty, co
+  má už nastavené Render. (Žádné mailové credentials už potřeba nejsou.)
+
+Stav: **implementováno (2026-08-26)**, čeká se na založení 2 GitHub Secrets
+uživatelem a push, pak se ověří prvním ručním spuštěním workflow.

@@ -60,3 +60,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # local SQLite database (dev data, not source)
 /prisma/dev.db
+
+# local ad-hoc backup output (real weekly backups go to /backups via CI)
+/backup.json
