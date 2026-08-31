@@ -1,7 +1,9 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react'
 import './App.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+const ADMIN_TOKEN_KEY = 'kj-admin-token'
+const MAX_SONGS_PER_DATE = 4
 
 interface Song {
   id: number
@@ -14,7 +16,13 @@ interface DateRange {
   to: string | null
 }
 
-type View = 'stats' | 'songbook' | 'overview'
+interface HistoryEntry {
+  id: number
+  songId: number
+  songName: string
+}
+
+type View = 'stats' | 'songbook' | 'overview' | 'admin'
 type Tab = 'all' | 'year' | 'month' | 'week'
 type SortField = 'count' | 'lastSung' | 'alpha'
 type SortDirection = 'desc' | 'asc'
@@ -36,6 +44,11 @@ const VIEWS: { id: View; label: string; description: string }[] = [
     label: 'Statistiky',
     description:
       'Přehled, co se kdy hrálo. Pomůže najít píseň, která se dlouho nezpívala, nebo ukázat, co se hraje často a kdy. Klikni na píseň a uvidíš, kdy přesně se zpívala.',
+  },
+  {
+    id: 'admin',
+    label: 'Admin',
+    description: 'Ruční zápis, které písně se zpívaly na dané datum (jen pro přihlášeného admina).',
   },
 ]
 
@@ -276,6 +289,287 @@ function PlayedOverview({ songs }: { songs: Song[] }) {
   )
 }
 
+function emptySlots(): string[] {
+  return Array.from({ length: MAX_SONGS_PER_DATE }, () => '')
+}
+
+function SongCombobox({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string
+  onChange: (songId: string) => void
+  options: Song[]
+  placeholder: string
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    const selected = options.find((song) => String(song.id) === value)
+    setQuery(selected ? selected.name : '')
+  }, [value, options])
+
+  const filtered = useMemo(() => {
+    const normalizedQuery = normalizeForSearch(query)
+    return options.filter((song) => normalizeForSearch(song.name).includes(normalizedQuery))
+  }, [options, query])
+
+  const selectSong = (songId: string, name: string) => {
+    onChange(songId)
+    setQuery(name)
+    setOpen(false)
+  }
+
+  const clear = () => {
+    onChange('')
+    setQuery('')
+    setOpen(false)
+  }
+
+  const handleBlur = () => {
+    const selected = options.find((song) => String(song.id) === value)
+    setQuery(selected ? selected.name : '')
+    setOpen(false)
+  }
+
+  return (
+    <div className="song-combobox">
+      <input
+        type="text"
+        className="song-combobox-input"
+        placeholder={placeholder}
+        value={query}
+        onChange={(event) => {
+          setQuery(event.target.value)
+          setOpen(true)
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={handleBlur}
+      />
+      {open && (
+        <ul className="song-combobox-list" onMouseDown={(event) => event.preventDefault()}>
+          <li>
+            <button type="button" className="song-combobox-clear" onClick={clear}>
+              — prázdné —
+            </button>
+          </li>
+          {filtered.length === 0 && <li className="song-combobox-empty">Nic nenalezeno</li>}
+          {filtered.map((song) => (
+            <li key={song.id}>
+              <button type="button" onClick={() => selectSong(String(song.id), song.name)}>
+                {song.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function AdminPanel({ songs }: { songs: Song[] }) {
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem(ADMIN_TOKEN_KEY))
+  const [password, setPassword] = useState('')
+  const [loginError, setLoginError] = useState<string | null>(null)
+  const [date, setDate] = useState('')
+  const [entries, setEntries] = useState<HistoryEntry[]>([])
+  const [slots, setSlots] = useState<string[]>(emptySlots())
+  const [loadingEntries, setLoadingEntries] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+
+  const sortedSongs = useMemo(
+    () => [...songs].sort((a, b) => a.name.localeCompare(b.name, 'cs')),
+    [songs],
+  )
+
+  const logout = () => {
+    localStorage.removeItem(ADMIN_TOKEN_KEY)
+    setToken(null)
+  }
+
+  const handleUnauthorized = () => {
+    logout()
+    setActionError('Přihlášení vypršelo, přihlas se prosím znovu.')
+  }
+
+  const login = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setLoginError(null)
+    try {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      if (!res.ok) throw new Error('Nesprávné heslo')
+      const data = (await res.json()) as { token: string }
+      localStorage.setItem(ADMIN_TOKEN_KEY, data.token)
+      setToken(data.token)
+      setPassword('')
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Přihlášení selhalo')
+    }
+  }
+
+  const loadEntries = async (forDate: string, authToken: string) => {
+    setLoadingEntries(true)
+    setActionError(null)
+    setSaveMessage(null)
+    try {
+      const res = await fetch(`${API_URL}/admin/song-history?date=${forDate}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+      if (res.status === 401) return handleUnauthorized()
+      if (!res.ok) throw new Error('Nepodařilo se načíst data pro dané datum')
+      const data = (await res.json()) as HistoryEntry[]
+      setEntries(data)
+      setSlots(
+        Array.from({ length: MAX_SONGS_PER_DATE }, (_, i) =>
+          data[i] ? String(data[i].songId) : '',
+        ),
+      )
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Chyba')
+    } finally {
+      setLoadingEntries(false)
+    }
+  }
+
+  useEffect(() => {
+    if (date && token) {
+      loadEntries(date, token)
+    } else {
+      setEntries([])
+      setSlots(emptySlots())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, token])
+
+  const setSlot = (index: number, songId: string) => {
+    setSaveMessage(null)
+    setSlots((current) => current.map((value, i) => (i === index ? songId : value)))
+  }
+
+  const optionsForSlot = (index: number) => {
+    const usedElsewhere = new Set(slots.filter((_, i) => i !== index && slots[i] !== ''))
+    return sortedSongs.filter((song) => !usedElsewhere.has(String(song.id)))
+  }
+
+  const save = async () => {
+    if (!date || !token) return
+    setSaving(true)
+    setActionError(null)
+    setSaveMessage(null)
+    try {
+      const currentIds = slots.filter((value) => value !== '')
+      const toRemove = entries.filter((entry) => !currentIds.includes(String(entry.songId)))
+      const toAdd = currentIds.filter(
+        (songId) => !entries.some((entry) => String(entry.songId) === songId),
+      )
+
+      for (const entry of toRemove) {
+        const res = await fetch(`${API_URL}/admin/song-history/${entry.id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.status === 401) return handleUnauthorized()
+        if (!res.ok) throw new Error('Smazání se nezdařilo')
+      }
+
+      for (const songId of toAdd) {
+        const res = await fetch(`${API_URL}/admin/song-history`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ songId: Number(songId), date }),
+        })
+        if (res.status === 401) return handleUnauthorized()
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { message?: string } | null
+          throw new Error(body?.message ?? 'Uložení se nezdařilo')
+        }
+      }
+
+      await loadEntries(date, token)
+      setSaveMessage('Uloženo ✓')
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Chyba')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!token) {
+    return (
+      <form className="admin-login" onSubmit={login}>
+        <label htmlFor="admin-password">Admin heslo:</label>
+        <input
+          id="admin-password"
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+        <button type="submit">Přihlásit se</button>
+        {loginError && <p className="error">{loginError}</p>}
+      </form>
+    )
+  }
+
+  return (
+    <div className="admin-panel">
+      <button className="logout-button" onClick={logout}>
+        Odhlásit se
+      </button>
+
+      <div className="admin-date-picker">
+        <label htmlFor="admin-date">Datum:</label>
+        <input
+          id="admin-date"
+          type="date"
+          className="admin-date-input"
+          value={date}
+          onChange={(event) => setDate(event.target.value)}
+        />
+        {date && <span className="admin-date-selected">{formatDate(date)}</span>}
+      </div>
+
+      {actionError && <p className="error">{actionError}</p>}
+
+      {date &&
+        (loadingEntries ? (
+          <p>Načítám...</p>
+        ) : (
+          <>
+            <div className="admin-slots">
+              {slots.map((value, index) => (
+                <div className="admin-slot" key={index}>
+                  <span className="admin-slot-number">{index + 1}</span>
+                  <SongCombobox
+                    value={value}
+                    onChange={(songId) => setSlot(index, songId)}
+                    options={optionsForSlot(index)}
+                    placeholder="Hledej píseň…"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="admin-save-row">
+              <button className="admin-save-button" onClick={save} disabled={saving}>
+                {saving ? 'Ukládám...' : 'Uložit'}
+              </button>
+              {saveMessage && <span className="admin-save-message">{saveMessage}</span>}
+            </div>
+          </>
+        ))}
+    </div>
+  )
+}
+
 function App() {
   const [songs, setSongs] = useState<Song[]>([])
   const [dateRange, setDateRange] = useState<DateRange | null>(null)
@@ -458,6 +752,8 @@ function App() {
       {!loading && !error && view === 'songbook' && <Songbook songs={songs} />}
 
       {!loading && !error && view === 'overview' && <PlayedOverview songs={songs} />}
+
+      {!loading && !error && view === 'admin' && <AdminPanel songs={songs} />}
     </div>
   )
 }

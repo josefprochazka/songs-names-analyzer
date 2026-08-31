@@ -122,22 +122,48 @@ v jednom souboru `backend/prisma/dev.db` na disku vývojáře. Tenhle soubor:
       naposledy zpíváno/abecedy, časová osa historie po rozkliknutí písně)
       a Zpěvník (abecední seznam všech písní ze zpěvníku KJ, vyhledávání
       bez ohledu na diakritiku, tlačítko na zkopírování přesného názvu).
-- [ ] Google Sheets integrace — **plán obrácený oproti původní myšlence**,
-      viz sekce "Plán: přidávání písní přes appku + sync do Sheets" níže.
+- [ ] Google Sheets integrace — **směr rozhodnut 2026-08-26: appka bude
+      číst ze Sheetu** (lidé dál zapisují do Sheetu jako dosud, appka to
+      pravidelně synchronizuje do DB), viz sekce "Plán: sync z Google
+      Sheets do DB" níže.
 - [ ] Kosmetika: pár duplicit/překlepů v `song-names-dictionary.txt`
       (např. "Základ Můj" vs "Základ můj", "Nemusím víc se bat" vs
       "se bát") — stejná píseň vede na dva řádky v seznamu
 - [ ] Auto-deploy na Renderu historicky nefungoval spolehlivě kvůli buildu,
       který padal (viz backend/CLAUDE.md) — teď by měl auto-deploy na push
       fungovat, ale zatím to nebylo ověřeno na dalším běžném pushi
+- [x] **Admin přihlášení + ruční správa historie zpívání** (2026-08-31) —
+      samostatný malý admin ovládací prvek zmíněný v poznámce níže,
+      implementovaný jako nová záložka "Admin" v appce:
+      - Backend: `POST /auth/login` (heslo z `ADMIN_PASSWORD` env, vrací
+        podepsaný token — HMAC-SHA256 přes `JWT_SECRET`, vlastní minimální
+        implementace v `backend/src/auth/token.util.ts`, žádná nová
+        závislost). `AuthGuard` chrání `admin/song-history` endpointy
+        (`GET`/`POST`/`DELETE`) v `backend/src/songs/admin-song-history.controller.ts`.
+      - Frontend: záložka "Admin" (`AdminPanel` v `App.tsx`) — přihlašovací
+        formulář (token do `localStorage`), pak výběr data + combobox na
+        přidání existující písně (ze `Song`, ne volný text) na dané datum,
+        max 4 písně/datum (kontrolováno i na backendu), možnost smazání
+        záznamu.
+      - Env proměnné `ADMIN_PASSWORD`/`JWT_SECRET` nastavené uživatelem v
+        Render dashboardu i lokálně v `backend/.env` (2026-08-31).
+      - **Známé omezení:** po přidání/smazání přes admin panel se hlavní
+        seznam písní (záložky Statistiky/Přehled/Zpěvník) sám neobnoví —
+        appka fetchuje `/songs` jen při načtení stránky,
+        takže po zápisu je potřeba stránku obnovit (F5), aby se změna
+        promítla i mimo Admin záložku.
+      - **Stav: implementováno, čeká na ruční otestování uživatelem**
+        (lokálně i na produkci po pushi).
 - [ ] **Flag na písně, co se nemají hrát** (nápad, 2026-07-25) — pár písní
       by chtěl uživatel označit, aby se v appce zobrazily červeně (přehled
       "tohle nehrát"). Řešení: nový sloupec `Song.doNotSing` (Boolean,
       migrace + ruční aplikace na Turso jako u předchozích migrací),
       promítnout do `GET /songs`, ve frontendu podmíněně obarvit název.
       Otevřená otázka: nastavovat ručně přes SQL, nebo přes UI (checkbox/
-      tlačítko + update endpoint) — druhé zapadá do plánu formuláře na
-      přidávání písní výše. Zatím neimplementováno.
+      tlačítko + update endpoint). Pozn. (2026-08-26): plán formuláře na
+      přidávání písní v appce byl zrušen (viz sekce o Sheets sync níže),
+      takže "přes UI" by teď znamenalo samostatný malý admin ovládací
+      prvek, ne součást toho zrušeného formuláře. Zatím neimplementováno.
 
 ## Plán práce — pořadí dalších kroků
 
@@ -150,40 +176,50 @@ v jednom souboru `backend/prisma/dev.db` na disku vývojáře. Tenhle soubor:
 6. ~~Ověřit, že celé to (FE+BE+DB) funguje živě~~ hotovo
 7. ~~Skutečné UI se statistikami~~ hotovo (2026-07-25) — Statistiky +
    Zpěvník záložky, viz výše
-8. **DALŠÍ KROK: přidávání písní přes appku + sync do Google Sheets**
-   (viz sekce níže)
+8. **DALŠÍ KROK: sync z Google Sheets do DB** (viz sekce níže)
 
-## Plán: přidávání písní přes appku + sync do Sheets
+## Plán: sync z Google Sheets do DB
 
-Původní myšlenka byla: appka čte z Google Sheetu (lidé zapisují do Sheetu,
-appka to v noci naimportuje). Zavrhnuto — zdrojový Sheet je nepořádný (3
-sloupce písní, nekonzistentní oddělovače), parsování by bylo křehké a řešilo
-by se to samé co dřív s `song-names-dictionary.txt`.
+### Historie rozhodování (pro kontext, ať se příště netočíme v kruhu)
 
-**Nový plán (obrácený směr toku dat):**
+1. **Původní myšlenka** (před 2026-07-25): appka čte z Google Sheetu (lidé
+   zapisují do Sheetu, appka to v noci naimportuje). Tehdy zavrhnuto —
+   zdrojový Sheet je nepořádný (3 sloupce písní, nekonzistentní oddělovače),
+   parsování by bylo křehké a řešilo by se to samé co dřív s
+   `song-names-dictionary.txt`.
+2. **Obrácený plán** (2026-07-25 → 2026-08-26): appka dostane formulář na
+   přidávání písní a stane se zdrojem pravdy místo Sheetu; zápisy by se
+   pak promítaly zpátky do Sheetu jako zrcadlo/záloha (appka → Sheets).
+   **Zrušeno 2026-08-26** — uživatel nemůže vynutit všem přispěvatelům,
+   aby přestali zapisovat do Sheetu a přešli na appku. Lidé budou dál
+   zapisovat do Sheetu jako dosud.
+3. **Aktuální plán (2026-08-26): návrat k původní myšlence #1**, ale
+   automatizovaně místo ručního importu — appka je zase **čtenář** Sheetu,
+   Sheet zůstává primární místo zápisu pro uživatele, DB (Turso) je z něj
+   pravidelně synchronizovaná a appka zobrazuje data z DB.
 
-1. Appka dostane formulář na přidání záznamu (datum + výběr písně).
-   Výběr písně **není volný text** — je to autocomplete/dropdown ze
-   stávajícího seznamu písní (stejná data co Zpěvník), takže odpadá
-   celý problém s překlepy/neznámými písněmi. Appka se tím stává
-   zdrojem pravdy místo Sheetu.
-   - Pokud píseň v seznamu ještě není, jde ji rovnou z formuláře
-     založit jako novou (dostane `id`, od té chvíle se nabízí v
-     autocomplete i ostatním, sbírá si vlastní historii dat zpívání).
-     `song-names-dictionary.txt` tím přestává být ručně udržovaný
-     zdroj pravdy — Zpěvník roste organicky přímo z používání appky.
-2. Backend endpoint uloží záznam rovnou do Turso (real-time, žádný
-   import skript).
-3. Zápis se promítne i do Google Sheetu přes Sheets API (`googleapis`
-   balíček, service account s právem editace na konkrétní Sheet) —
-   Sheet se stává jen zrcadlem/zálohou, appka do něj píše, nečte z něj.
-   Řešit: automaticky při každém přidání vs. tlačítko "Synchronizovat"
-   (asi obojí — auto sync + ruční tlačítko jako pojistka).
-4. Jednorázový setup: založit Google Cloud service account, nasdílet
-   mu cílový Sheet s právem na zápis, credentials uložit jako env
-   proměnná na Renderu (podobně jako `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`).
+### Co je potřeba vyřešit (stejné zádrhely jako u bodu #1 výše, teď reálně)
 
-Stav: **zatím jen nápad/diskuze (2026-07-25)**, ještě neimplementováno.
+- **Parsování Sheetu** — 3 sloupce písní, nekonzistentní oddělovače
+  (čárka/středník/nový řádek). Potřeba stejná normalizační logika, jakou
+  dnes používá `backend/scripts/import-data.ts` (normalizace bez ohledu
+  na diakritiku/velikost písmen, matchování na `Song.name`, fallback do
+  `UnknownSong` pro nenapárované řádky) — jen zdroj dat se změní z xlsx
+  souboru na živé Google Sheets API volání.
+- **Google Sheets API — čtecí přístup**: service account s právem
+  **Viewer** (appka jen čte, nepíše) na cílový Sheet, credentials jako
+  env proměnná na Renderu (podobně jako `TURSO_DATABASE_URL`/
+  `TURSO_AUTH_TOKEN`), balíček `googleapis`.
+- **Frekvence/trigger syncu**: pravidelný cron (GitHub Actions, podobně
+  jako u zálohy — viz sekce níže) vs. endpoint spouštěný appkou/ručně vs.
+  obojí. Zatím nerozhodnuto.
+- **Vztah ke stávajícímu ručnímu importu**: `scripts/import-data.ts` +
+  `backend/data/*.xlsx` zůstávají zatím funkční jako fallback; živý sync
+  ze Sheetu je má postupně nahradit jako běžnou cestu, jak se nová data
+  dostávají do DB.
+
+Stav: **rozhodnutí o směru padlo (2026-08-26), implementace zatím
+neproběhla** — bude se řešit v další session.
 
 ## Plán: záloha dat (DB backup + restore)
 
@@ -244,9 +280,12 @@ zálohování:
    Nodemailer přes Gmail SMTP app password. Cílová adresa zatím
    uživatelův Gmail.
 
-Vztah k Sheets sync plánu výše: Sheet po zavedení sync bude taky fungovat
-jako jistá záloha, ale `.dump` je jednodušší, nezávislý na Sheets API a
-je to přesná bitová kopie celé DB (ne jen přepis dat do jiné struktury).
+Pozn. (2026-08-26): směr Sheets syncu se od napsání téhle poznámky obrátil
+zpět na Sheets → DB (appka jen čte, nepíše do Sheetu — viz sekce "Plán:
+sync z Google Sheets do DB" výše), takže Sheet už nebude "zrcadlo psané
+appkou". Sheet ale pořád zůstává nezávislým zdrojem dat mimo appku (lidé
+do něj zapisují přímo), takže tahle DB záloha (`backend/backups/`) i
+samotný Sheet fungují jako dvě oddělené, na sobě nezávislé zálohy.
 
 ### Realizace (2026-08-26) — odchylka od původního plánu výše
 
