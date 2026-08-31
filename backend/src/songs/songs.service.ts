@@ -2,12 +2,55 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 
 const MAX_SONGS_PER_DATE = 4;
+const TIME_ZONE = 'Europe/Prague';
 
-function dayRange(dateStr: string): { start: Date; end: Date } {
-  const start = new Date(`${dateStr}T00:00:00.000Z`);
-  if (Number.isNaN(start.getTime())) {
+function getTimeZoneOffsetMinutes(date: Date, timeZone: string): number {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+  const parts = formatter.formatToParts(date).reduce<Record<string, string>>((acc, part) => {
+    acc[part.type] = part.value;
+    return acc;
+  }, {});
+  const asUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  return Math.round((asUtc - date.getTime()) / 60000);
+}
+
+// Historical data (imported from the Excel source) stores each song's date as
+// local Prague midnight converted to UTC, not plain UTC midnight. New entries
+// have to match that same convention, otherwise the same calendar day ends up
+// split across two different UTC instants depending on where it was written.
+function pragueMidnightUtc(dateStr: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr ?? '');
+  if (!match) {
     throw new BadRequestException('Neplatné datum.');
   }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  const anchor = new Date(Date.UTC(year, month - 1, day, 12));
+  const offsetMinutes = getTimeZoneOffsetMinutes(anchor, TIME_ZONE);
+
+  return new Date(Date.UTC(year, month - 1, day, 0, -offsetMinutes));
+}
+
+function dayRange(dateStr: string): { start: Date; end: Date } {
+  const start = pragueMidnightUtc(dateStr);
   const end = new Date(start);
   end.setUTCDate(end.getUTCDate() + 1);
   return { start, end };
