@@ -1,31 +1,24 @@
 name: Weekly DB backup
-
 on:
   schedule:
-    - cron: '58 8 * * 1' # test: 08:58 UTC = 10:58 tvého času
+    - cron: '1 23 * * 1' # test: pondělí 23:01 UTC = úterý 01:01 tvého času
   workflow_dispatch: {}
-
 permissions:
   contents: write
-
 jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-
       - name: Install dependencies
         working-directory: backend
         run: npm ci
-
       - name: Generate Prisma client
         working-directory: backend
         run: npx prisma generate
-
       - name: Run backup
         working-directory: backend
         env:
@@ -34,7 +27,6 @@ jobs:
         run: |
           mkdir -p backups
           npm run backup -- "backups/songs-backup-$(date +%F).json"
-
       - name: Commit backup to repo
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
