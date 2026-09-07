@@ -2,7 +2,7 @@ name: Weekly DB backup
 
 on:
   schedule:
-    - cron: '5 9 * * 1' # test: 09:05 UTC = 11:05 tvého času
+    - cron: '58 8 * * 1' # test: 08:58 UTC = 10:58 tvého času
   workflow_dispatch: {}
 
 permissions:
