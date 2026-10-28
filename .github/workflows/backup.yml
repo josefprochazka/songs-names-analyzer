@@ -31,4 +31,4 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: 'chore: weekly DB backup snapshot'
-          file_pattern: 'backend/backups/*.json'
+          file_pattern: 'backend/backups'
