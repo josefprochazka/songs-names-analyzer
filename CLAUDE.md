@@ -132,28 +132,58 @@ v jednom souboru `backend/prisma/dev.db` na disku vývojáře. Tenhle soubor:
 - [ ] Auto-deploy na Renderu historicky nefungoval spolehlivě kvůli buildu,
       který padal (viz backend/CLAUDE.md) — teď by měl auto-deploy na push
       fungovat, ale zatím to nebylo ověřeno na dalším běžném pushi
-- [x] **Admin přihlášení + ruční správa historie zpívání** (2026-08-31) —
-      samostatný malý admin ovládací prvek zmíněný v poznámce níže,
-      implementovaný jako nová záložka "Admin" v appce:
-      - Backend: `POST /auth/login` (heslo z `ADMIN_PASSWORD` env, vrací
-        podepsaný token — HMAC-SHA256 přes `JWT_SECRET`, vlastní minimální
-        implementace v `backend/src/auth/token.util.ts`, žádná nová
-        závislost). `AuthGuard` chrání `admin/song-history` endpointy
-        (`GET`/`POST`/`DELETE`) v `backend/src/songs/admin-song-history.controller.ts`.
-      - Frontend: záložka "Admin" (`AdminPanel` v `App.tsx`) — přihlašovací
-        formulář (token do `localStorage`), pak výběr data + combobox na
-        přidání existující písně (ze `Song`, ne volný text) na dané datum,
-        max 4 písně/datum (kontrolováno i na backendu), možnost smazání
-        záznamu.
+- [x] **Admin přihlášení + ruční správa historie zpívání** (2026-08-31,
+      otestováno a funguje) — samostatný malý admin ovládací prvek zmíněný
+      v poznámce níže, implementovaný jako nová záložka "Admin" v appce.
+      Účel: umožnit ruční zápis "co se zpívalo kdy" přímo v appce, jako
+      dočasná náhrada, dokud není hotový Sheets sync (viz sekce níže).
+      - **Backend:** `POST /auth/login` (heslo z `ADMIN_PASSWORD` env,
+        vrací podepsaný token — HMAC-SHA256 přes `JWT_SECRET`, vlastní
+        minimální implementace v `backend/src/auth/token.util.ts`, žádná
+        nová závislost, token platí 7 dní). `AuthGuard`
+        (`backend/src/auth/auth.guard.ts`) chrání `admin/song-history`
+        endpointy (`GET`/`POST`/`DELETE`,
+        `backend/src/songs/admin-song-history.controller.ts`) — `GET`
+        vrátí písně pro dané datum, `POST` přidá píseň na datum (max 4
+        písně/den, kontrolováno na backendu), `DELETE` smaže záznam.
+      - **Frontend:** záložka "Admin" (`AdminPanel` v `App.tsx`) —
+        přihlašovací formulář (token do `localStorage`), pak zvětšený
+        date picker se zvýrazněným štítkem vybraného data, a 4 očíslovaná
+        okýnka (1–4) na písně pro to datum. Každé okýnko je vlastní
+        vyhledávací combobox (`SongCombobox`) — filtruje se podle
+        libovolné části názvu (ne jen podle první písmenky jako u
+        obyčejného `<select>`), stejná normalizace bez diakritiky jako
+        má hledání ve Zpěvníku. Při výběru data se okýnka automaticky
+        předvyplní tím, co už pro ten den v DB je (i historická data z
+        importu) — tlačítko **Uložit** pak spočítá rozdíl (diff) oproti
+        původnímu stavu a pošle jen potřebná přidání/smazání, takže jde
+        i běžně "přepsat" špatně vybranou píseň jinou.
       - Env proměnné `ADMIN_PASSWORD`/`JWT_SECRET` nastavené uživatelem v
         Render dashboardu i lokálně v `backend/.env` (2026-08-31).
-      - **Známé omezení:** po přidání/smazání přes admin panel se hlavní
-        seznam písní (záložky Statistiky/Přehled/Zpěvník) sám neobnoví —
-        appka fetchuje `/songs` jen při načtení stránky,
+      - **Zádrhel č. 1 (vyřešeno, pro pochopení uživatele i budoucí
+        session):** lokální testování (`npm run start:dev`) píše do
+        lokálního `backend/prisma/dev.db`, ne do produkční Turso databáze
+        — to jsou dvě oddělené DB. Změny přidané přes Admin lokálně se
+        proto na živém webu (Vercel → Render → Turso) neobjeví; reálné
+        zápisy je potřeba dělat přímo na produkčním webu.
+      - **Zádrhel č. 2 (bug, opraveno 2026-08-31, commit
+        `76658c0`):** historická data (import z Excelu) i zobrazení dat v
+        appce počítají s "pražskou půlnocí převedenou na UTC" (např.
+        píseň zpívaná 1. 10. 2023 je v DB uložená jako
+        `2023-09-30T22:00:00.000Z`), ale admin endpointy původně počítaly
+        den jednoduše jako UTC půlnoc-půlnoc → při výběru staršího data v
+        Adminu se historické záznamy pro ten den vůbec nenašly (okýnka
+        zůstala prázdná, i když píseň v appce jinde vidět byla). Fix:
+        `pragueMidnightUtc()` v `backend/src/songs/songs.service.ts`
+        spočítá offset Europe/Prague přes `Intl.DateTimeFormat` (funguje
+        stejně lokálně i na Renderu bez ohledu na to, v jaké timezoně
+        běží server) a podle něj správně namapuje `YYYY-MM-DD` z date
+        pickeru na stejnou UTC instanci, jakou používá zbytek dat.
+      - **Známé omezení (zatím neřešeno):** po přidání/smazání přes admin
+        panel se hlavní seznam písní (záložky Statistiky/Přehled/Zpěvník)
+        sám neobnoví — appka fetchuje `/songs` jen při načtení stránky,
         takže po zápisu je potřeba stránku obnovit (F5), aby se změna
         promítla i mimo Admin záložku.
-      - **Stav: implementováno, čeká na ruční otestování uživatelem**
-        (lokálně i na produkci po pushi).
 - [ ] **Flag na písně, co se nemají hrát** (nápad, 2026-07-25) — pár písní
       by chtěl uživatel označit, aby se v appce zobrazily červeně (přehled
       "tohle nehrát"). Řešení: nový sloupec `Song.doNotSing` (Boolean,
