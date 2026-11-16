@@ -49,6 +49,19 @@ function pragueMidnightUtc(dateStr: string): Date {
   return new Date(Date.UTC(year, month - 1, day, 0, -offsetMinutes));
 }
 
+const MAX_SONG_NAME_LENGTH = 200;
+
+// Same diacritics/case-insensitive comparison the frontend uses for search,
+// so "Základ Můj" and "Základ můj" count as the same song.
+function normalizeSongName(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function dayRange(dateStr: string): { start: Date; end: Date } {
   const start = pragueMidnightUtc(dateStr);
   const end = new Date(start);
@@ -122,6 +135,26 @@ export class SongsService {
 
     const entry = await this.prisma.songHistory.create({ data: { songId, date: start } });
     return { id: entry.id, songId, songName: song.name };
+  }
+
+  async createSong(rawName: string) {
+    const name = (typeof rawName === 'string' ? rawName : '').replace(/\s+/g, ' ').trim();
+    if (!name) {
+      throw new BadRequestException('Název písně nesmí být prázdný.');
+    }
+    if (name.length > MAX_SONG_NAME_LENGTH) {
+      throw new BadRequestException(`Název písně je moc dlouhý (max. ${MAX_SONG_NAME_LENGTH} znaků).`);
+    }
+
+    const normalized = normalizeSongName(name);
+    const existing = await this.prisma.song.findMany({ select: { name: true } });
+    const duplicate = existing.find((song) => normalizeSongName(song.name) === normalized);
+    if (duplicate) {
+      throw new BadRequestException(`Píseň „${duplicate.name}“ už v seznamu je.`);
+    }
+
+    const song = await this.prisma.song.create({ data: { name } });
+    return { id: song.id, name: song.name, dates: [] as string[] };
   }
 
   async removeHistoryEntry(id: number) {

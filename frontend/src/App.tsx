@@ -370,7 +370,149 @@ function SongCombobox({
   )
 }
 
-function AdminPanel({ songs }: { songs: Song[] }) {
+const MAX_SIMILAR_SUGGESTIONS = 3
+
+function NewSongForm({
+  songs,
+  token,
+  onAdded,
+  onUnauthorized,
+}: {
+  songs: Song[]
+  token: string
+  onAdded: (song: Song) => void
+  onUnauthorized: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  const normalizedName = normalizeForSearch(name).replace(/\s+/g, ' ')
+
+  const exactMatch = useMemo(
+    () =>
+      normalizedName
+        ? songs.find((song) => normalizeForSearch(song.name).replace(/\s+/g, ' ') === normalizedName)
+        : undefined,
+    [songs, normalizedName],
+  )
+
+  // Shown as a gentle hint, so the admin notices a song that already exists
+  // under a slightly different name before creating a duplicate.
+  const similarSongs = useMemo(() => {
+    if (normalizedName.length < 3 || exactMatch) return []
+    return songs
+      .filter((song) => normalizeForSearch(song.name).includes(normalizedName))
+      .slice(0, MAX_SIMILAR_SUGGESTIONS)
+  }, [songs, normalizedName, exactMatch])
+
+  const close = () => {
+    setOpen(false)
+    setName('')
+    setError(null)
+  }
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!normalizedName || exactMatch) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch(`${API_URL}/admin/songs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name }),
+      })
+      if (res.status === 401) return onUnauthorized()
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { message?: string } | null
+        throw new Error(body?.message ?? 'Přidání písně se nezdařilo')
+      }
+      const song = (await res.json()) as Song
+      onAdded(song)
+      setSuccessMessage(`Píseň „${song.name}“ přidána ✓ Teď ji najdeš v okýnkách u data.`)
+      close()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Chyba')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="new-song">
+        <button
+          type="button"
+          className="new-song-toggle"
+          onClick={() => {
+            setOpen(true)
+            setSuccessMessage(null)
+          }}
+        >
+          + Přidat novou píseň do seznamu
+        </button>
+        {successMessage && <p className="admin-save-message">{successMessage}</p>}
+      </div>
+    )
+  }
+
+  return (
+    <form
+      className="new-song new-song-open"
+      onSubmit={submit}
+      onKeyDown={(event) => event.key === 'Escape' && close()}
+    >
+      <label htmlFor="new-song-name" className="new-song-label">
+        Nová píseň
+      </label>
+      <p className="new-song-help">
+        Napiš přesný název písně, která ještě v seznamu není. Pak ji půjde vybrat u libovolného
+        data.
+      </p>
+      <input
+        id="new-song-name"
+        type="text"
+        className="new-song-input"
+        placeholder="Název písně…"
+        value={name}
+        maxLength={200}
+        autoFocus
+        onChange={(event) => {
+          setName(event.target.value)
+          setError(null)
+        }}
+      />
+
+      {exactMatch && (
+        <p className="new-song-warning">Tahle píseň už v seznamu je: „{exactMatch.name}“</p>
+      )}
+      {similarSongs.length > 0 && (
+        <p className="new-song-similar">
+          Podobné písně v seznamu: {similarSongs.map((song) => `„${song.name}“`).join(', ')}
+        </p>
+      )}
+      {error && <p className="error">{error}</p>}
+
+      <div className="new-song-actions">
+        <button
+          type="submit"
+          className="admin-save-button"
+          disabled={saving || !normalizedName || Boolean(exactMatch)}
+        >
+          {saving ? 'Přidávám...' : 'Přidat píseň'}
+        </button>
+        <button type="button" className="new-song-cancel" onClick={close}>
+          Zrušit
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function AdminPanel({ songs, onSongAdded }: { songs: Song[]; onSongAdded: (song: Song) => void }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(ADMIN_TOKEN_KEY))
   const [password, setPassword] = useState('')
   const [loginError, setLoginError] = useState<string | null>(null)
@@ -524,6 +666,13 @@ function AdminPanel({ songs }: { songs: Song[] }) {
       <button className="logout-button" onClick={logout}>
         Odhlásit se
       </button>
+
+      <NewSongForm
+        songs={songs}
+        token={token}
+        onAdded={onSongAdded}
+        onUnauthorized={handleUnauthorized}
+      />
 
       <div className="admin-date-picker">
         <label htmlFor="admin-date">Datum:</label>
@@ -753,7 +902,7 @@ function App() {
 
       {!loading && !error && view === 'overview' && <PlayedOverview songs={songs} />}
 
-      {!loading && !error && view === 'admin' && <AdminPanel songs={songs} />}
+      {!loading && !error && view === 'admin' && <AdminPanel songs={songs} onSongAdded={(song) => setSongs((current) => [...current, song])} />}
     </div>
   )
 }

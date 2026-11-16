@@ -489,3 +489,81 @@
   font-size: 14px;
   font-weight: 600;
 }
+
+.new-song {
+  margin-bottom: 24px;
+}
+
+.new-song-toggle {
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 16px;
+  border: 1px dashed #3b6ef0;
+  border-radius: 8px;
+  background: #fff;
+  color: #3b6ef0;
+  cursor: pointer;
+}
+
+.new-song-toggle:hover {
+  background: #eef2ff;
+}
+
+.new-song-open {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #dbe3fb;
+  border-radius: 10px;
+  background: #f7f9ff;
+}
+
+.new-song-label {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.new-song-help,
+.new-song-similar {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.new-song-warning {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.new-song-input {
+  font: inherit;
+  font-size: 17px;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+}
+
+.new-song-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.new-song-cancel {
+  font: inherit;
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+}
+
+.new-song-cancel:hover {
+  background: #f5f5f5;
+}
